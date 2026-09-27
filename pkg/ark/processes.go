@@ -202,6 +202,10 @@ func (p *Process) Stop() {
 	p.cancel(ErrProcessStopping)
 }
 
+func (p *Process) Context() context.Context {
+	return p.ctx
+}
+
 func (p *Process) Done() <-chan struct{} {
 	return p.ctx.Done()
 }
