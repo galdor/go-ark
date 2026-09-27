@@ -55,6 +55,10 @@ const (
 	ProcessEventTerminated = "terminated"
 )
 
+type ProcessOptions struct {
+	Inline bool
+}
+
 type Process struct {
 	name     string
 	behavior ProcessBehavior
@@ -144,22 +148,12 @@ func (p *Process) Error() error {
 }
 
 func (p *Process) AddChild(name string, behavior ProcessBehavior) *Process {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	if p.state == ProcessStateStopping || p.state == ProcessStateTerminated {
-		panic(fmt.Sprintf("cannot add child in state %q", p.state))
-	}
-
-	child := p.newChild(name, behavior)
-
-	p.wg.Add(1)
-	child.run(&p.wg)
-
-	return child
+	return p.AddChildWithOptions(name, behavior, ProcessOptions{})
 }
 
-func (p *Process) AddInlineChild(name string, behavior ProcessBehavior) *Process {
+func (p *Process) AddChildWithOptions(
+	name string, behavior ProcessBehavior, opts ProcessOptions,
+) *Process {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -170,7 +164,12 @@ func (p *Process) AddInlineChild(name string, behavior ProcessBehavior) *Process
 	child := p.newChild(name, behavior)
 
 	p.wg.Add(1)
-	child.runInline(&p.wg)
+
+	if opts.Inline {
+		child.runInline(&p.wg)
+	} else {
+		child.run(&p.wg)
+	}
 
 	return child
 }
