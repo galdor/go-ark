@@ -2,8 +2,9 @@ package ark
 
 import (
 	"errors"
-	"log/slog"
 	"testing"
+
+	"go.n16f.net/ark/pkg/ark/log"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,7 +49,8 @@ func (tp *TestProcess) Main() error {
 }
 
 func RunTestProcess(p *TestProcess) error {
-	return Run("test", p, slog.Default())
+	logger := log.DefaultLogger().With("scope", "test")
+	return Run("test", p, logger)
 }
 
 func TestQuickRun(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go.n16f.net/ark/pkg/ark"
+	"go.n16f.net/ark/pkg/ark/log"
 )
 
 type Example struct {
@@ -53,6 +54,6 @@ func (e *Example) Main() error {
 }
 
 func main() {
-	logger := slog.Default().With("service", "example")
+	logger := log.DefaultLogger().With("scope", "example")
 	ark.MustRun("example", NewExample(), logger)
 }
