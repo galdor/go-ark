@@ -122,6 +122,7 @@ func Run(name string, behavior ProcessBehavior, logger *slog.Logger) error {
 				}
 
 			case <-sigChan:
+				fmt.Fprintln(os.Stderr)
 				p.Stop()
 			}
 		}
