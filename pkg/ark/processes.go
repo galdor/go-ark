@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"slices"
@@ -60,8 +61,9 @@ type ProcessOptions struct {
 }
 
 type Process struct {
-	name     string
-	behavior ProcessBehavior
+	Name     string
+	Behavior ProcessBehavior
+	Log      *slog.Logger
 
 	ctx    context.Context
 	cancel context.CancelCauseFunc
@@ -81,21 +83,25 @@ type ProcessBehavior interface {
 	Main() error
 }
 
-func MustRun(name string, behavior ProcessBehavior) {
-	if err := Run(name, behavior); err != nil {
+func MustRun(name string, behavior ProcessBehavior, logger *slog.Logger) {
+	if err := Run(name, behavior, logger); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func Run(name string, behavior ProcessBehavior) error {
+func Run(name string, behavior ProcessBehavior, logger *slog.Logger) error {
+	logger = logger.With(slog.Group("process", "name", name))
+
 	ctx, cancel := context.WithCancelCause(context.Background())
 
 	p := Process{
-		name:     name,
-		behavior: behavior,
-		ctx:      ctx,
-		cancel:   cancel,
+		Name:     name,
+		Behavior: behavior,
+		Log:      logger,
+
+		ctx:    ctx,
+		cancel: cancel,
 	}
 
 	p.run(nil)
@@ -175,13 +181,17 @@ func (p *Process) AddChildWithOptions(
 }
 
 func (p *Process) newChild(name string, behavior ProcessBehavior) *Process {
+	logger := p.Log.With(slog.Group("process", "name", name))
+
 	ctx, cancel := context.WithCancelCause(p.ctx)
 
 	child := Process{
-		name:     name,
-		behavior: behavior,
-		ctx:      ctx,
-		cancel:   cancel,
+		Name:     name,
+		Behavior: behavior,
+		Log:      logger,
+
+		ctx:    ctx,
+		cancel: cancel,
 	}
 
 	return &child
@@ -321,7 +331,7 @@ func (p *Process) main() {
 }
 
 func (p *Process) onStarting() (ProcessState, error) {
-	if err := p.behavior.Start(p); err != nil {
+	if err := p.Behavior.Start(p); err != nil {
 		return ProcessStateStopping, err
 	}
 
@@ -331,7 +341,7 @@ func (p *Process) onStarting() (ProcessState, error) {
 }
 
 func (p *Process) onRunning() (ProcessState, error) {
-	if err := p.behavior.Main(); err != nil {
+	if err := p.Behavior.Main(); err != nil {
 		return ProcessStateStopping, err
 	}
 
@@ -342,7 +352,7 @@ func (p *Process) onStopping() ProcessState {
 	p.cancel(ErrProcessStopping)
 	p.wg.Wait() // wait for children
 
-	p.behavior.Stop()
+	p.Behavior.Stop()
 	return ProcessStateTerminated
 }
 

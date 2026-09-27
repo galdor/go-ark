@@ -2,6 +2,7 @@ package ark
 
 import (
 	"errors"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,12 +47,16 @@ func (tp *TestProcess) Main() error {
 	return nil
 }
 
+func RunTestProcess(p *TestProcess) error {
+	return Run("test", p, slog.Default())
+}
+
 func TestQuickRun(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
 	tp := TestProcess{}
-	require.NoError(Run("test", &tp))
+	require.NoError(RunTestProcess(&tp))
 
 	assert.Equal(1, tp.NbStartCalls)
 	assert.Equal(1, tp.NbMainCalls)
@@ -63,7 +68,7 @@ func TestStartError(t *testing.T) {
 	assert := assert.New(t)
 
 	tp := TestProcess{StartFailure: true}
-	err := Run("test", &tp)
+	err := RunTestProcess(&tp)
 
 	var startErr *ProcessStartError
 	require.Error(err)
@@ -80,7 +85,7 @@ func TestMainError(t *testing.T) {
 	assert := assert.New(t)
 
 	tp := TestProcess{MainFailure: true}
-	err := Run("test", &tp)
+	err := RunTestProcess(&tp)
 
 	var mainErr *ProcessMainError
 	require.Error(err)
