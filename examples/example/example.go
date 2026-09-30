@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log/slog"
-	_ "net/http/pprof"
 	"time"
 
 	"go.n16f.net/ark/pkg/ark"
@@ -10,7 +8,7 @@ import (
 )
 
 type Example struct {
-	Log     *slog.Logger
+	Log     *log.Logger
 	process *ark.Process
 }
 

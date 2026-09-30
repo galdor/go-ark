@@ -10,6 +10,8 @@ import (
 	"slices"
 	"sync"
 	"syscall"
+
+	"go.n16f.net/ark/pkg/ark/log"
 )
 
 type ProcessState string
@@ -63,7 +65,7 @@ type ProcessOptions struct {
 type Process struct {
 	Name     string
 	Behavior ProcessBehavior
-	Log      *slog.Logger
+	Log      *log.Logger
 
 	ctx    context.Context
 	cancel context.CancelCauseFunc
@@ -83,15 +85,15 @@ type ProcessBehavior interface {
 	Main() error
 }
 
-func MustRun(name string, behavior ProcessBehavior, logger *slog.Logger) {
+func MustRun(name string, behavior ProcessBehavior, logger *log.Logger) {
 	if err := Run(name, behavior, logger); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func Run(name string, behavior ProcessBehavior, logger *slog.Logger) error {
-	logger = logger.With(slog.Group("process", "name", name))
+func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
+	logger = logger.With("process", name)
 
 	ctx, cancel := context.WithCancelCause(context.Background())
 
