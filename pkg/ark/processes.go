@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"slices"
@@ -93,7 +92,7 @@ func MustRun(name string, behavior ProcessBehavior, logger *log.Logger) {
 }
 
 func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
-	logger = logger.With("process", name)
+	logger = logger.With("scope", name)
 
 	ctx, cancel := context.WithCancelCause(context.Background())
 
@@ -184,7 +183,7 @@ func (p *Process) AddChildWithOptions(
 }
 
 func (p *Process) newChild(name string, behavior ProcessBehavior) *Process {
-	logger := p.Log.With(slog.Group("process", "name", name))
+	logger := p.Log.With("scope", name)
 
 	ctx, cancel := context.WithCancelCause(p.ctx)
 

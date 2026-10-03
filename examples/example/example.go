@@ -12,10 +12,6 @@ type Example struct {
 	process *ark.Process
 }
 
-func NewExample() *Example {
-	return &Example{}
-}
-
 func (e *Example) Start(p *ark.Process) error {
 	e.Log = p.Log
 	e.process = p
@@ -52,6 +48,5 @@ func (e *Example) Main() error {
 }
 
 func main() {
-	logger := log.DefaultLogger().With("scope", "example")
-	ark.MustRun("example", NewExample(), logger)
+	ark.MustRun("example", &Example{}, log.DefaultLogger())
 }

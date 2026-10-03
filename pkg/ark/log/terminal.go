@@ -39,8 +39,6 @@ func (h *TerminalHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	h2 := *h
 
 	for _, attr := range attrs {
-		h2.attributes.AppendAttr(attr, h2.group)
-
 		if attr.Key == "scope" {
 			if value := FormatAttributeValue(attr.Value); value != "" {
 				if h2.scope != "" {
@@ -48,6 +46,8 @@ func (h *TerminalHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 				}
 				h2.scope += value
 			}
+		} else {
+			h2.attributes.AppendAttr(attr, h2.group)
 		}
 	}
 
