@@ -338,6 +338,7 @@ func (p *Process) main() {
 
 func (p *Process) onStarting() (ProcessState, error) {
 	if err := p.Behavior.Start(p); err != nil {
+		p.Log.Error("cannot start: %v", err)
 		return ProcessStateStopping, err
 	}
 
@@ -348,6 +349,7 @@ func (p *Process) onStarting() (ProcessState, error) {
 
 func (p *Process) onRunning() (ProcessState, error) {
 	if err := p.Behavior.Main(); err != nil {
+		p.Log.Error("process error: %v", err)
 		return ProcessStateStopping, err
 	}
 
