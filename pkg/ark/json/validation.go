@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"go.n16f.net/ark/pkg/ark/common"
+	"go.n16f.net/ark/pkg/ark/utils"
 )
 
 type ValidationError struct {
@@ -200,12 +200,12 @@ func checkObject(value any) bool {
 	}
 
 	if valueType.Kind() != reflect.Pointer {
-		common.Panic("value %#v (%T) is not a pointer", value, value)
+		utils.Panic("value %#v (%T) is not a pointer", value, value)
 	}
 
 	pointedValueType := valueType.Elem()
 	if pointedValueType.Kind() != reflect.Struct {
-		common.Panic("value %#v (%T) is not a pointer to a structure",
+		utils.Panic("value %#v (%T) is not a pointer to a structure",
 			value, value)
 	}
 
@@ -225,7 +225,7 @@ func pointerTokenString(token any) string {
 	case int:
 		s = strconv.Itoa(value)
 	default:
-		common.Panic("invalid token %#v (%T)", token, token)
+		utils.Panic("invalid token %#v (%T)", token, token)
 	}
 
 	return s

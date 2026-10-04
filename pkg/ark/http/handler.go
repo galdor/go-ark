@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"go.n16f.net/ark/pkg/ark"
 	"go.n16f.net/ark/pkg/ark/json"
 	"go.n16f.net/ark/pkg/ark/log"
+	"go.n16f.net/ark/pkg/ark/utils"
 )
 
 var (
@@ -21,13 +23,14 @@ var (
 type Handler struct {
 	Log            *log.Logger
 	Server         *Server
+	Options        *RouteOptions
 	Request        *http.Request
 	ResponseWriter http.ResponseWriter
-	Options        *RouteOptions
 
-	process   *ark.Process
-	startTime time.Time
-	errorCode string
+	process     *ark.Process
+	startTime   time.Time
+	requestTime *time.Duration
+	errorCode   string
 }
 
 func (h *Handler) Start(p *ark.Process) error {
@@ -48,7 +51,40 @@ func (h *Handler) Main() error {
 }
 
 func (h *Handler) Stop() {
-	// TODO log request
+	h.requestTime = new(time.Since(h.startTime))
+
+	h.logRequest()
+}
+
+func (h *Handler) logRequest() {
+	if h.Options.DisableAccessLog {
+		return
+	}
+
+	req := h.Request
+	w := h.ResponseWriter.(*ResponseWriter)
+
+	attrs := []any{
+		"event", "http_server.request",
+		"time", h.requestTime.Microseconds(),
+	}
+
+	if h.errorCode != "" {
+		attrs = append(attrs, "error")
+		attrs = append(attrs, h.errorCode)
+	}
+
+	statusString := "-"
+	if w.Status != 0 {
+		statusString = strconv.Itoa(w.Status)
+
+		attrs = append(attrs, "status")
+		attrs = append(attrs, w.Status)
+	}
+
+	h.Log.InfoData(attrs, "%s %s %s %s",
+		req.Method, req.URL.Path, statusString,
+		utils.FormatSeconds(h.requestTime.Seconds(), 1))
 }
 
 func (h *Handler) Reply(status int, r io.Reader) {

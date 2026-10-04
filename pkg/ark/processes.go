@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"go.n16f.net/ark/pkg/ark/common"
 	"go.n16f.net/ark/pkg/ark/log"
+	"go.n16f.net/ark/pkg/ark/utils"
 )
 
 type ProcessState string
@@ -337,11 +337,11 @@ func (p *Process) onStarting() (state ProcessState, err error) {
 
 	defer func() {
 		if v := recover(); v != nil {
-			msg := common.RecoverValueString(v)
-			trace := common.StackTrace(2, 20, true)
+			msg := utils.RecoverValueString(v)
+			trace := utils.StackTrace(2, 20, true)
 
 			state = ProcessStateStopping
-			err = common.NewPanicError(msg, trace)
+			err = utils.NewPanicError(msg, trace)
 			return
 		}
 	}()
@@ -356,11 +356,11 @@ func (p *Process) onStarting() (state ProcessState, err error) {
 func (p *Process) onRunning() (state ProcessState, err error) {
 	defer func() {
 		if v := recover(); v != nil {
-			msg := common.RecoverValueString(v)
-			trace := common.StackTrace(2, 20, true)
+			msg := utils.RecoverValueString(v)
+			trace := utils.StackTrace(2, 20, true)
 
 			state = ProcessStateStopping
-			err = common.NewPanicError(msg, trace)
+			err = utils.NewPanicError(msg, trace)
 			return
 		}
 	}()

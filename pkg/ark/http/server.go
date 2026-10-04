@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"go.n16f.net/ark/pkg/ark"
-	"go.n16f.net/ark/pkg/ark/common"
 	"go.n16f.net/ark/pkg/ark/json"
 	"go.n16f.net/ark/pkg/ark/log"
+	"go.n16f.net/ark/pkg/ark/utils"
 )
 
 const (
@@ -84,7 +84,7 @@ func (s *Server) Start(p *ark.Process) error {
 
 	listener, err := net.Listen("tcp", s.Cfg.Address)
 	if err != nil {
-		err = common.UnwrapNetOpError(err, "listen")
+		err = utils.UnwrapNetOpError(err, "listen")
 		return fmt.Errorf("cannot listen on %s: %w", s.Cfg.Address, err)
 	}
 	s.listener = listener
@@ -150,14 +150,12 @@ func (s *Server) RouteWithOptions(
 ) {
 	handlerFunc := func(w http.ResponseWriter, req *http.Request) {
 		h := requestHandler(req)
-		h.Options = &options
-
-		s.finalizeHandler(h, req, pathPattern, method, routeFunc)
+		s.finalizeHandler(h, req, pathPattern, method, routeFunc, &options)
 
 		defer func() {
 			if v := recover(); v != nil {
-				msg := common.RecoverValueString(v)
-				trace := common.StackTrace(2, 20, true)
+				msg := utils.RecoverValueString(v)
+				trace := utils.StackTrace(2, 20, true)
 
 				h.ReplyInternalError(500, "panic: %s\n%s", msg, trace)
 			}
@@ -187,10 +185,11 @@ func (s *Server) RouteWithOptions(
 
 func (s *Server) finalizeHandler(
 	h *Handler, req *http.Request, pathPattern, method string,
-	routeFunc RouteFunc,
+	routeFunc RouteFunc, options *RouteOptions,
 ) {
 	// TODO handler data
 
+	h.Options = options
 	h.Request = req // the request may have been modified by the muxer
 	// h.Query = req.URL.Query()
 
@@ -254,7 +253,7 @@ func AdaptativeErrorHandler(
 
 func (s *Server) hNotFound(w http.ResponseWriter, req *http.Request) {
 	h := requestHandler(req)
-	s.finalizeHandler(h, req, "", req.Method, nil)
+	s.finalizeHandler(h, req, "", req.Method, nil, &RouteOptions{})
 
 	h.ReplyError(404, "http_route_not_found", "HTTP route not found")
 }
