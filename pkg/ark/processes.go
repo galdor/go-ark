@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"go.n16f.net/ark/pkg/ark/common"
 	"go.n16f.net/ark/pkg/ark/log"
 )
 
@@ -298,11 +299,20 @@ func (p *Process) main() {
 	}
 }
 
-func (p *Process) onStarting() (ProcessState, error) {
+func (p *Process) onStarting() (state ProcessState, err error) {
 	p.childrenCtx, p.childrenCancel = context.WithCancel(p.ctx)
 	p.err = nil
 
-	// TODO panic recovery
+	defer func() {
+		if v := recover(); v != nil {
+			msg := common.RecoverValueString(v)
+			trace := common.StackTrace(2, 20, true)
+
+			state = ProcessStateStopping
+			err = common.NewPanicError(msg, trace)
+			return
+		}
+	}()
 
 	if err := p.Behavior.Start(p); err != nil {
 		return ProcessStateStopping, err
@@ -311,8 +321,17 @@ func (p *Process) onStarting() (ProcessState, error) {
 	return ProcessStateRunning, nil
 }
 
-func (p *Process) onRunning() (ProcessState, error) {
-	// TODO panic recovery
+func (p *Process) onRunning() (state ProcessState, err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			msg := common.RecoverValueString(v)
+			trace := common.StackTrace(2, 20, true)
+
+			state = ProcessStateStopping
+			err = common.NewPanicError(msg, trace)
+			return
+		}
+	}()
 
 	if err := p.Behavior.Main(); err != nil {
 		return ProcessStateStopping, err
