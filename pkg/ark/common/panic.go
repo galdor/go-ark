@@ -6,6 +6,19 @@ import (
 	"runtime"
 )
 
+type PanicError struct {
+	Message string
+	Trace   string
+}
+
+func NewPanicError(msg, trace string) *PanicError {
+	return &PanicError{Message: msg, Trace: trace}
+}
+
+func (err *PanicError) Error() string {
+	return fmt.Sprintf("panic: %s\n%s", err.Message, err.Trace)
+}
+
 func Panic(format string, args ...interface{}) {
 	panic(fmt.Sprintf(format, args...))
 }

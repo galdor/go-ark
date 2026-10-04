@@ -84,7 +84,8 @@ func (s *Server) Start(p *ark.Process) error {
 
 	listener, err := net.Listen("tcp", s.Cfg.Address)
 	if err != nil {
-		return fmt.Errorf("cannot listen on %q: %w", s.Cfg.Address, err)
+		// TODO unwrap listen
+		return fmt.Errorf("cannot listen on %s: %w", s.Cfg.Address, err)
 	}
 	s.listener = listener
 
@@ -94,6 +95,11 @@ func (s *Server) Start(p *ark.Process) error {
 }
 
 func (s *Server) Stop() {
+	if s.listener != nil {
+		s.listener.Close()
+	}
+
+	s.server = nil
 }
 
 func (s *Server) Main() error {
@@ -105,7 +111,8 @@ func (s *Server) Main() error {
 	select {
 	case err := <-errChan:
 		return err
-	case <-s.process.Done():
+
+	case <-s.process.Stopping():
 	}
 
 	timeout := 5 * time.Second

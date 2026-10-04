@@ -2,13 +2,12 @@ package ark
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
-	"slices"
 	"sync"
 	"syscall"
+	"time"
 
 	"go.n16f.net/ark/pkg/ark/log"
 )
@@ -19,6 +18,7 @@ const (
 	ProcessStateStarting   = "starting"
 	ProcessStateRunning    = "running"
 	ProcessStateStopping   = "stopping"
+	ProcessStateRestarting = "restarting"
 	ProcessStateTerminated = "terminated"
 )
 
@@ -46,36 +46,30 @@ func (err *ProcessMainError) Unwrap() error {
 	return err.Err
 }
 
-var (
-	ErrProcessStopping = errors.New("process stopping")
-)
-
-type ProcessEvent string
-
-const (
-	ProcessEventStarted    = "started"
-	ProcessEventTerminated = "terminated"
-)
-
 type ProcessOptions struct {
-	Inline bool
+	Inline         bool
+	RestartOnError bool
+	RestartBackoff *Backoff
 }
 
 type Process struct {
 	Name     string
 	Behavior ProcessBehavior
 	Log      *log.Logger
+	Opts     *ProcessOptions
 
 	ctx    context.Context
-	cancel context.CancelCauseFunc
-	wg     sync.WaitGroup
+	cancel context.CancelFunc
+
+	childrenCtx    context.Context
+	childrenCancel context.CancelFunc
+	childrenWg     sync.WaitGroup
 
 	mutex sync.RWMutex
 	state ProcessState
 	err   error
 
-	eventConsumerMutex sync.RWMutex
-	eventConsumers     []chan ProcessEvent
+	terminated chan struct{}
 }
 
 type ProcessBehavior interface {
@@ -86,7 +80,7 @@ type ProcessBehavior interface {
 
 func MustRun(name string, behavior ProcessBehavior, logger *log.Logger) {
 	if err := Run(name, behavior, logger); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		logger.Error("%v", err)
 		os.Exit(1)
 	}
 }
@@ -94,15 +88,24 @@ func MustRun(name string, behavior ProcessBehavior, logger *log.Logger) {
 func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
 	logger = logger.With("scope", name)
 
-	ctx, cancel := context.WithCancelCause(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	childrenCtx, childrenCancel := context.WithCancel(ctx)
+
+	opts := ProcessOptions{}
 
 	p := Process{
 		Name:     name,
 		Behavior: behavior,
 		Log:      logger,
+		Opts:     &opts,
 
 		ctx:    ctx,
 		cancel: cancel,
+
+		childrenCtx:    childrenCtx,
+		childrenCancel: childrenCancel,
+
+		terminated: make(chan struct{}),
 	}
 
 	p.run(nil)
@@ -111,21 +114,15 @@ func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sigChan)
 
-	eventChan := p.SubscribeEvents()
+wait:
+	for {
+		select {
+		case <-p.terminated:
+			break wait
 
-	if eventChan != nil {
-	wait:
-		for {
-			select {
-			case event := <-eventChan:
-				if event == ProcessEventTerminated {
-					break wait
-				}
-
-			case <-sigChan:
-				fmt.Fprintln(os.Stderr)
-				p.Stop()
-			}
+		case <-sigChan:
+			fmt.Fprintln(os.Stderr)
+			p.Stop()
 		}
 	}
 
@@ -169,89 +166,55 @@ func (p *Process) AddChildWithOptions(
 		panic(fmt.Sprintf("cannot add child in state %q", p.state))
 	}
 
-	child := p.newChild(name, behavior)
+	child := p.newChild(name, behavior, &opts)
 
-	p.wg.Add(1)
+	p.childrenWg.Add(1)
 
 	if opts.Inline {
-		child.runInline(&p.wg)
+		child.runInline(&p.childrenWg)
 	} else {
-		child.run(&p.wg)
+		child.run(&p.childrenWg)
 	}
 
 	return child
 }
 
-func (p *Process) newChild(name string, behavior ProcessBehavior) *Process {
+func (p *Process) newChild(
+	name string, behavior ProcessBehavior, opts *ProcessOptions,
+) *Process {
 	logger := p.Log.With("scope", name)
 
-	ctx, cancel := context.WithCancelCause(p.ctx)
+	if opts.RestartOnError {
+		if opts.RestartBackoff == nil {
+			opts.RestartBackoff = NewBackoff(1.0, 10.0, 1.5, 0.1)
+		}
+	}
 
 	child := Process{
 		Name:     name,
 		Behavior: behavior,
 		Log:      logger,
+		Opts:     opts,
 
-		ctx:    ctx,
-		cancel: cancel,
+		terminated: make(chan struct{}),
 	}
+
+	child.ctx, child.cancel = context.WithCancel(p.childrenCtx)
+	child.childrenCtx, child.childrenCancel = context.WithCancel(child.ctx)
 
 	return &child
 }
 
 func (p *Process) Stop() {
-	p.cancel(ErrProcessStopping)
+	p.cancel()
 }
 
 func (p *Process) Context() context.Context {
 	return p.ctx
 }
 
-func (p *Process) Done() <-chan struct{} {
+func (p *Process) Stopping() <-chan struct{} {
 	return p.ctx.Done()
-}
-
-func (p *Process) SubscribeEvents() <-chan ProcessEvent {
-	p.mutex.RLock()
-	p.eventConsumerMutex.Lock()
-
-	var eventChan chan ProcessEvent
-	if p.state != ProcessStateTerminated {
-		eventChan = make(chan ProcessEvent)
-		p.eventConsumers = append(p.eventConsumers, eventChan)
-	}
-
-	p.eventConsumerMutex.Unlock()
-	p.mutex.RUnlock()
-
-	return eventChan
-}
-
-func (p *Process) UnsubscribeEvents(ch <-chan ProcessEvent) {
-	p.eventConsumerMutex.Lock()
-	p.eventConsumers = slices.DeleteFunc(p.eventConsumers,
-		func(ch2 chan ProcessEvent) bool { return ch2 == ch })
-	p.eventConsumerMutex.Unlock()
-}
-
-func (p *Process) WaitForTermination(p2 *Process) bool {
-	eventChan := p2.SubscribeEvents()
-	if eventChan == nil {
-		return true
-	}
-
-	for {
-		select {
-		case event := <-eventChan:
-			if event == ProcessEventTerminated {
-				return true
-			}
-
-		case <-p.Done():
-			p2.UnsubscribeEvents(eventChan)
-			return false
-		}
-	}
 }
 
 func (p *Process) run(wg *sync.WaitGroup) {
@@ -277,18 +240,11 @@ func (p *Process) runInline(wg *sync.WaitGroup) {
 }
 
 func (p *Process) main() {
-	defer func() {
-		err := p.Error()
-		if err == nil {
-			err = ErrProcessStopping
-		}
-
-		p.cancel(err)
-	}()
+	defer close(p.terminated)
+	defer p.cancel()
 
 	p.mutex.Lock()
 	p.state = ProcessStateStarting
-	p.err = nil
 	p.mutex.Unlock()
 
 	for {
@@ -313,9 +269,15 @@ func (p *Process) main() {
 		case ProcessStateStopping:
 			newState = p.onStopping()
 
+		case ProcessStateRestarting:
+			newState = p.onRestarting()
+
 		case ProcessStateTerminated:
-			p.onTerminated()
 			return
+		}
+
+		if err != nil {
+			p.Log.Error("%v", err)
 		}
 
 		select {
@@ -337,19 +299,22 @@ func (p *Process) main() {
 }
 
 func (p *Process) onStarting() (ProcessState, error) {
+	p.childrenCtx, p.childrenCancel = context.WithCancel(p.ctx)
+	p.err = nil
+
+	// TODO panic recovery
+
 	if err := p.Behavior.Start(p); err != nil {
-		p.Log.Error("cannot start: %v", err)
 		return ProcessStateStopping, err
 	}
-
-	p.publishEvent(ProcessEventStarted)
 
 	return ProcessStateRunning, nil
 }
 
 func (p *Process) onRunning() (ProcessState, error) {
+	// TODO panic recovery
+
 	if err := p.Behavior.Main(); err != nil {
-		p.Log.Error("process error: %v", err)
 		return ProcessStateStopping, err
 	}
 
@@ -357,31 +322,32 @@ func (p *Process) onRunning() (ProcessState, error) {
 }
 
 func (p *Process) onStopping() ProcessState {
-	p.cancel(ErrProcessStopping)
-	p.wg.Wait() // wait for children
+	p.childrenCancel()
+	p.childrenWg.Wait()
 
 	p.Behavior.Stop()
+
+	p.mutex.RLock()
+	pErr := p.err
+	p.mutex.RUnlock()
+
+	if pErr != nil && p.Opts.RestartOnError {
+		return ProcessStateRestarting
+	}
+
 	return ProcessStateTerminated
 }
 
-func (p *Process) onTerminated() {
-	p.eventConsumerMutex.Lock()
-	consumers := p.eventConsumers
-	p.eventConsumers = nil
-	p.eventConsumerMutex.Unlock()
+func (p *Process) onRestarting() ProcessState {
+	delay := p.Opts.RestartBackoff.Delay()
 
-	for _, eventChan := range consumers {
-		eventChan <- ProcessEventTerminated
-		close(eventChan)
-	}
-}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
 
-func (p *Process) publishEvent(event ProcessEvent) {
-	p.eventConsumerMutex.RLock()
-	eventConsumers := slices.Clone(p.eventConsumers)
-	p.eventConsumerMutex.RUnlock()
-
-	for _, eventChan := range eventConsumers {
-		eventChan <- event
+	select {
+	case <-timer.C:
+		return ProcessStateStarting
+	case <-p.Stopping():
+		return ProcessStateTerminated
 	}
 }

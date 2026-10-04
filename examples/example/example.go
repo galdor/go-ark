@@ -1,6 +1,8 @@
 package main
 
 import (
+	nethttp "net/http"
+	_ "net/http/pprof"
 	"time"
 
 	"go.n16f.net/ark/pkg/ark"
@@ -32,8 +34,8 @@ func (e *Example) Main() error {
 
 	for {
 		select {
-		case <-e.process.Done():
-			e.Log.Info("process done")
+		case <-e.process.Stopping():
+			e.Log.Info("process stopping")
 			return nil
 
 		case <-timer.C:
@@ -45,8 +47,13 @@ func (e *Example) Main() error {
 			e.Log.Info("sleep")
 		}
 	}
+
 }
 
 func main() {
+	go func() {
+		nethttp.ListenAndServe("localhost:6060", nil)
+	}()
+
 	ark.MustRun("example", &Example{}, log.DefaultLogger())
 }
