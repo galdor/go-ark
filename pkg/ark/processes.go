@@ -49,6 +49,7 @@ func (err *ProcessMainError) Unwrap() error {
 
 type ProcessOptions struct {
 	Inline         bool
+	Unlinked       bool
 	RestartOnError bool
 	RestartBackoff *Backoff
 }
@@ -65,6 +66,9 @@ type Process struct {
 	childrenCtx    context.Context
 	childrenCancel context.CancelFunc
 	childrenWg     sync.WaitGroup
+
+	parentErrChan chan<- error
+	errChan       chan error
 
 	mutex sync.RWMutex
 	state ProcessState
@@ -92,6 +96,9 @@ func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	childrenCtx, childrenCancel := context.WithCancel(ctx)
 
+	errChan := make(chan error)
+	defer close(errChan)
+
 	opts := ProcessOptions{}
 
 	p := Process{
@@ -105,6 +112,9 @@ func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
 
 		childrenCtx:    childrenCtx,
 		childrenCancel: childrenCancel,
+
+		parentErrChan: errChan,
+		errChan:       make(chan error),
 
 		terminated: make(chan struct{}),
 	}
@@ -120,6 +130,10 @@ wait:
 		select {
 		case <-p.terminated:
 			break wait
+
+		case <-p.errChan:
+			// The child already logged the error.
+			p.Stop()
 
 		case <-sigChan:
 			fmt.Fprintln(os.Stderr)
@@ -197,6 +211,8 @@ func (p *Process) newChild(
 		Log:      logger,
 		Opts:     opts,
 
+		parentErrChan: p.errChan,
+
 		terminated: make(chan struct{}),
 	}
 
@@ -244,6 +260,15 @@ func (p *Process) main() {
 	defer close(p.terminated)
 	defer p.cancel()
 
+	go func() {
+		select {
+		case <-p.errChan:
+			p.Stop()
+		case <-p.Stopping():
+			return
+		}
+	}()
+
 	p.mutex.Lock()
 	p.state = ProcessStateStarting
 	p.mutex.Unlock()
@@ -279,6 +304,12 @@ func (p *Process) main() {
 
 		if err != nil {
 			p.Log.Error("%v", err)
+
+			// We only propagate the error to the parent if we are not going to
+			// restart and if we are linked to it.
+			if !p.Opts.RestartOnError && !p.Opts.Unlinked {
+				p.parentErrChan <- err
+			}
 		}
 
 		select {
@@ -301,6 +332,7 @@ func (p *Process) main() {
 
 func (p *Process) onStarting() (state ProcessState, err error) {
 	p.childrenCtx, p.childrenCancel = context.WithCancel(p.ctx)
+	p.errChan = make(chan error)
 	p.err = nil
 
 	defer func() {
@@ -343,6 +375,7 @@ func (p *Process) onRunning() (state ProcessState, err error) {
 func (p *Process) onStopping() ProcessState {
 	p.childrenCancel()
 	p.childrenWg.Wait()
+	close(p.errChan)
 
 	p.Behavior.Stop()
 
