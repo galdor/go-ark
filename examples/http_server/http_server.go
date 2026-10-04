@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	nethttp "net/http"
-	_ "net/http/pprof"
 
 	"go.n16f.net/ark/pkg/ark"
 	"go.n16f.net/ark/pkg/ark/http"
@@ -19,7 +17,10 @@ func (e *Example) Start(p *ark.Process) error {
 	e.Log = p.Log
 	e.process = p
 
-	httpServerCfg := http.ServerCfg{Address: "localhost:8080"}
+	httpServerCfg := http.ServerCfg{
+		Address:     "localhost:8080",
+		EnablePprof: true,
+	}
 
 	httpServer, err := http.NewServer(&httpServerCfg)
 	if err != nil {
@@ -46,9 +47,5 @@ func (e *Example) hPanic(h *http.Handler) {
 }
 
 func main() {
-	go func() {
-		nethttp.ListenAndServe("localhost:6060", nil)
-	}()
-
 	ark.MustRun("example", &Example{}, log.DefaultLogger())
 }

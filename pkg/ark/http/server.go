@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	nethttp "net/http"
+	"net/http/pprof"
 	"strings"
 	"time"
 
@@ -35,6 +36,7 @@ type ErrorHandler func(*Handler, int, string, string, ErrorData)
 type ServerCfg struct {
 	Address            string `json:"address"`
 	HideInternalErrors bool   `json:"hide_internal_errors"`
+	EnablePprof        bool   `json:"enable_pprof"`
 
 	ErrorHandler ErrorHandler `json:"-"`
 }
@@ -65,6 +67,10 @@ func NewServer(cfg *ServerCfg) (*Server, error) {
 	}
 
 	s.mux.HandleFunc("/", s.hNotFound)
+
+	if cfg.EnablePprof {
+		s.initPprofRoutes()
+	}
 
 	return &s, nil
 }
@@ -284,4 +290,41 @@ func RequestAcceptsText(req *http.Request) bool {
 	}
 
 	return false
+}
+
+func (s *Server) initPprofRoutes() {
+	handlerFunc := func(handler http.Handler) http.HandlerFunc {
+		return func(w http.ResponseWriter, req *http.Request) {
+			handler.ServeHTTP(w, req)
+		}
+	}
+
+	wrap := func(fn http.HandlerFunc) RouteFunc {
+		return func(h *Handler) {
+			fn(h.ResponseWriter, h.Request)
+		}
+	}
+
+	routes := map[string]http.HandlerFunc{
+		"/cmdline": pprof.Cmdline,
+		"/profile": pprof.Profile,
+		"/symbol":  pprof.Symbol,
+		"/trace":   pprof.Trace,
+
+		"/allocs":       handlerFunc(pprof.Handler("allocs")),
+		"/block":        handlerFunc(pprof.Handler("block")),
+		"/goroutine":    handlerFunc(pprof.Handler("goroutine")),
+		"/heap":         handlerFunc(pprof.Handler("heap")),
+		"/mutex":        handlerFunc(pprof.Handler("mutex")),
+		"/threadcreate": handlerFunc(pprof.Handler("threadcreate")),
+	}
+
+	// It would be convenient to serve pprof routes at /pprof but pprof assumes
+	// that the URI starts with /debug/pprof/ (not the final "/").
+
+	s.Route("/debug/pprof/", "GET", wrap(pprof.Index))
+
+	for subpath, handler := range routes {
+		s.Route("/debug/pprof"+subpath, "GET", wrap(handler))
+	}
 }
