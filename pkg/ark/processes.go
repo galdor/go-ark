@@ -110,9 +110,7 @@ func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
 	runCtx, runCancel := context.WithCancel(ctx)
 	childrenCtx, childrenCancel := context.WithCancel(runCtx)
 
-	errChan := make(chan error)
-
-	opts := ProcessOptions{}
+	opts := ProcessOptions{Unlinked: true}
 
 	p := Process{
 		Name:     name,
@@ -129,8 +127,7 @@ func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
 		childrenCtx:    childrenCtx,
 		childrenCancel: childrenCancel,
 
-		parentErrChan: errChan,
-		errChan:       make(chan error),
+		errChan: make(chan error),
 
 		terminated: make(chan struct{}),
 	}
@@ -146,9 +143,6 @@ wait:
 		select {
 		case <-p.terminated:
 			break wait
-
-		case <-errChan:
-			p.Stop()
 
 		case signo := <-sigChan:
 			fmt.Fprintln(os.Stderr)
@@ -295,18 +289,6 @@ func (p *Process) main() {
 	defer close(p.terminated)
 	defer p.cancel()
 
-	go func() {
-		select {
-		case err := <-p.errChan:
-			p.Stop()
-			<-p.terminated
-			p.maybePropagateError(err)
-
-		case <-p.Stopping():
-			return
-		}
-	}()
-
 	p.mutex.Lock()
 	p.state = ProcessStateStarting
 	p.mutex.Unlock()
@@ -337,40 +319,31 @@ func (p *Process) main() {
 			newState = p.onRestarting()
 
 		case ProcessStateTerminated:
+			p.maybePropagateError(p.Error())
 			return
 		}
 
 		if err != nil {
 			p.Log.Error("%v", err)
-			p.maybePropagateError(err)
 		}
 
-		// If we are stopping, either definitely or just for this run, we
-		// directly go and call the Stop method of the behavior.
-		p.mutex.RLock()
-		runCtx := p.runCtx
-		p.mutex.RUnlock()
+		if state == ProcessStateStarting || state == ProcessStateRunning {
+			p.mutex.RLock()
+			runCtx := p.runCtx
+			p.mutex.RUnlock()
 
-		stop := newState != ProcessStateTerminated &&
-			newState != ProcessStateRestarting
-
-		select {
-		case <-p.ctx.Done():
-			if stop {
+			select {
+			case <-p.ctx.Done():
 				newState = ProcessStateStopping
-			}
-
-		case <-runCtx.Done():
-			if stop {
+			case <-runCtx.Done():
 				newState = ProcessStateStopping
+			default:
 			}
-
-		default:
 		}
 
 		p.mutex.Lock()
 		p.state = newState
-		if err != nil {
+		if err != nil && p.err == nil {
 			p.err = err
 		}
 		p.mutex.Unlock()
@@ -379,10 +352,25 @@ func (p *Process) main() {
 
 func (p *Process) onStarting() (state ProcessState, err error) {
 	p.mutex.Lock()
-	p.runCtx, p.runCancel = context.WithCancel(p.ctx)
+	runCtx, runCancel := context.WithCancel(p.ctx)
+	p.runCtx, p.runCancel = runCtx, runCancel
 	p.childrenCtx, p.childrenCancel = context.WithCancel(p.runCtx)
 	p.err = nil
 	p.mutex.Unlock()
+
+	go func() {
+		select {
+		case err := <-p.errChan:
+			p.mutex.Lock()
+			if p.err == nil {
+				p.err = err
+			}
+			p.mutex.Unlock()
+			runCancel()
+
+		case <-runCtx.Done():
+		}
+	}()
 
 	defer func() {
 		if v := recover(); v != nil {
@@ -443,7 +431,9 @@ func (p *Process) onStopping() ProcessState {
 
 	p.mutex.RLock()
 	pErr := p.err
+	runCancel := p.runCancel
 	p.mutex.RUnlock()
+	runCancel()
 
 	// We check p.ctx.Err() because we do not restart if the context is
 	// canceled.
@@ -463,22 +453,28 @@ func (p *Process) onRestarting() ProcessState {
 	select {
 	case <-timer.C:
 		return ProcessStateStarting
-	case <-p.Stopping():
+	case <-p.ctx.Done():
 		return ProcessStateTerminated
 	}
 }
 
 func (p *Process) maybePropagateError(err error) {
-	// We only propagate the error to the parent if we are not going to
-	// restart and if we are linked to it.
-	if !p.Options.RestartOnError && !p.Options.Unlinked {
-		// The parent may have read an error for another child and is
-		// canceling the children context (the one p.ctx derives from).
-		// In that case there is nothing to do but return.
-		select {
-		case p.parentErrChan <- err:
-		case <-p.ctx.Done():
-		}
+	if err == nil {
+		return
+	}
+
+	// We do not propagate the error if we are going to restart or if we are
+	// unlinked.
+	if p.Options.RestartOnError || p.Options.Unlinked {
+		return
+	}
+
+	// The parent may have read an error for another child and is
+	// canceling the children context (the one p.ctx derives from).
+	// In that case there is nothing to do but return.
+	select {
+	case p.parentErrChan <- err:
+	case <-p.ctx.Done():
 	}
 }
 

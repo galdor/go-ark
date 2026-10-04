@@ -43,7 +43,7 @@ func (e *Example) Stop() {
 func (e *Example) Main() error {
 	e.Log.Info("main")
 
-	timer := time.NewTimer(3 * time.Second)
+	timer := time.NewTimer(5 * time.Second)
 	defer timer.Stop()
 
 	for {
