@@ -54,7 +54,7 @@ type Validatable interface {
 	ValidateJSON(v *Validator)
 }
 
-func Validate(value interface{}) error {
+func Validate(value any) error {
 	v := NewValidator()
 
 	if validatableValue, ok := value.(Validatable); ok {
@@ -161,7 +161,7 @@ func (v *Validator) CheckNetworkAddress(token any, s string) bool {
 	return true
 }
 
-func (v *Validator) CheckOptionalObject(token interface{}, value interface{}) bool {
+func (v *Validator) CheckOptionalObject(token any, value any) bool {
 	if !checkObject(value) {
 		return true
 	}
@@ -169,7 +169,7 @@ func (v *Validator) CheckOptionalObject(token interface{}, value interface{}) bo
 	return v.doCheckObject(token, value)
 }
 
-func (v *Validator) CheckObject(token interface{}, value interface{}) bool {
+func (v *Validator) CheckObject(token any, value any) bool {
 	if !checkObject(value) {
 		v.AddError(token, "missing_or_null_value", "missing or null value")
 		return false
