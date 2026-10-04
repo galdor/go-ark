@@ -79,7 +79,8 @@ func (h *TerminalHandler) Handle(ctx context.Context, r slog.Record) error {
 	buf = append(buf, r.Message...)
 	buf = append(buf, '\n')
 
-	if len(h.attributes)+r.NumAttrs() > 0 {
+	attributes := h.recordAttributes(r)
+	if len(attributes) > 0 {
 		buf = append(buf, "        "...)
 
 		appendAttribute := func(buf []byte, a Attribute) []byte {
@@ -95,16 +96,7 @@ func (h *TerminalHandler) Handle(ctx context.Context, r slog.Record) error {
 			return buf
 		}
 
-		for _, a := range h.attributes {
-			buf = appendAttribute(buf, a)
-		}
-
-		var recordAttributes Attributes
-		r.Attrs(func(attr slog.Attr) bool {
-			recordAttributes.AppendAttr(attr, h.group)
-			return true
-		})
-		for _, a := range recordAttributes {
+		for _, a := range attributes {
 			buf = appendAttribute(buf, a)
 		}
 
@@ -116,4 +108,21 @@ func (h *TerminalHandler) Handle(ctx context.Context, r slog.Record) error {
 	h.mutex.Unlock()
 
 	return err
+}
+
+func (h *TerminalHandler) recordAttributes(r slog.Record) Attributes {
+	var attributes Attributes
+
+	for _, a := range h.attributes {
+		attributes = append(attributes, a)
+	}
+
+	r.Attrs(func(attr slog.Attr) bool {
+		attributes.AppendAttr(attr, h.group)
+		return true
+	})
+
+	attributes.SortAndDeduplicate()
+
+	return attributes
 }

@@ -2,7 +2,9 @@ package log
 
 import (
 	"log/slog"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -37,6 +39,21 @@ func (as *Attributes) AppendAttr(attr slog.Attr, group string) {
 			*as = append(*as, Attribute{Key: key, Value: value})
 		}
 	}
+}
+
+func (as *Attributes) SortAndDeduplicate() {
+	as2 := *as
+
+	slices.SortStableFunc(as2, func(a1, a2 Attribute) int {
+		return strings.Compare(a1.Key, a2.Key)
+	})
+
+	// Always keep the last version of each attribute.
+	slices.Reverse(as2)
+
+	*as = slices.CompactFunc(*as, func(a1, a2 Attribute) bool {
+		return a1.Key == a2.Key
+	})
 }
 
 func FormatAttributeValue(value slog.Value) (s string) {
