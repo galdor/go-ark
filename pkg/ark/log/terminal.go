@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -97,6 +98,7 @@ func (h *TerminalHandler) WithGroup(name string) slog.Handler {
 }
 
 func (h *TerminalHandler) Handle(ctx context.Context, r slog.Record) error {
+
 	buf := make([]byte, 0, 1024)
 
 	baseColor := ColorDefault
@@ -114,7 +116,9 @@ func (h *TerminalHandler) Handle(ctx context.Context, r slog.Record) error {
 	buf = append(buf, h.colorize(ColorGreen, h.scope, h.Cfg.ScopeWidth)...)
 	buf = append(buf, "  "...)
 
-	buf = append(buf, h.colorize(baseColor, r.Message, 0)...)
+	message := strings.ReplaceAll(r.Message,
+		"\n", "\n"+strings.Repeat(" ", 7+2+h.Cfg.ScopeWidth+2))
+	buf = append(buf, h.colorize(baseColor, message, 0)...)
 	buf = append(buf, '\n')
 
 	attributes := h.recordAttributes(r)
