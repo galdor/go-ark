@@ -47,5 +47,5 @@ func (e *Example) hPanic(h *http.Handler) {
 }
 
 func main() {
-	ark.MustRun("example", &Example{}, log.DefaultLogger())
+	ark.MustRunProcess("example", &Example{}, log.DefaultLogger())
 }

@@ -56,5 +56,5 @@ func main() {
 		nethttp.ListenAndServe("localhost:6060", nil)
 	}()
 
-	ark.MustRun("example", &Example{}, log.DefaultLogger())
+	ark.MustRunProcess("example", &Example{}, log.DefaultLogger())
 }

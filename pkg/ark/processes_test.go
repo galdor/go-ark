@@ -50,7 +50,7 @@ func (tp *TestProcess) Main() error {
 
 func RunTestProcess(p *TestProcess) error {
 	logger := log.DefaultLogger().With("scope", "test")
-	return Run("test", p, logger)
+	return RunProcess("test", p, logger)
 }
 
 func TestQuickRun(t *testing.T) {

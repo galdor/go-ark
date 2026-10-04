@@ -96,14 +96,16 @@ type ProcessBehavior interface {
 	Main() error
 }
 
-func MustRun(name string, behavior ProcessBehavior, logger *log.Logger) {
-	if err := Run(name, behavior, logger); err != nil {
+func MustRunProcess(name string, behavior ProcessBehavior, logger *log.Logger) {
+	if err := RunProcess(name, behavior, logger); err != nil {
 		logger.Error("%v", err)
 		os.Exit(1)
 	}
 }
 
-func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
+func RunProcess(
+	name string, behavior ProcessBehavior, logger *log.Logger,
+) error {
 	logger = logger.With("scope", name)
 
 	ctx, cancel := context.WithCancel(context.Background())
