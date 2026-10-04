@@ -97,7 +97,6 @@ func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
 	childrenCtx, childrenCancel := context.WithCancel(ctx)
 
 	errChan := make(chan error)
-	defer close(errChan)
 
 	opts := ProcessOptions{}
 
@@ -131,12 +130,12 @@ wait:
 		case <-p.terminated:
 			break wait
 
-		case <-p.errChan:
-			// The child already logged the error.
+		case <-errChan:
 			p.Stop()
 
-		case <-sigChan:
+		case signo := <-sigChan:
 			fmt.Fprintln(os.Stderr)
+			p.Log.Info("received signal %d (%v)", signo, signo)
 			p.Stop()
 		}
 	}
@@ -175,15 +174,24 @@ func (p *Process) AddChildWithOptions(
 	name string, behavior ProcessBehavior, opts ProcessOptions,
 ) *Process {
 	p.mutex.Lock()
-	defer p.mutex.Unlock()
 
-	if p.state == ProcessStateStopping || p.state == ProcessStateTerminated {
-		panic(fmt.Sprintf("cannot add child in state %q", p.state))
+	switch p.state {
+	case ProcessStateStopping:
+		fallthrough
+	case ProcessStateRestarting:
+		fallthrough
+	case ProcessStateTerminated:
+		state := p.state
+		p.mutex.Unlock()
+
+		panic(fmt.Sprintf("cannot add child in state %q", state))
 	}
 
 	child := p.newChild(name, behavior, &opts)
 
 	p.childrenWg.Add(1)
+
+	p.mutex.Unlock()
 
 	if opts.Inline {
 		child.runInline(&p.childrenWg)
@@ -212,10 +220,13 @@ func (p *Process) newChild(
 		Options:  opts,
 
 		parentErrChan: p.errChan,
+		errChan:       make(chan error),
 
 		terminated: make(chan struct{}),
 	}
 
+	// Note that the parent must hold p.mutex. Not a problem since newChild is
+	// only called by AddChildWithOptions.
 	child.ctx, child.cancel = context.WithCancel(p.childrenCtx)
 	child.childrenCtx, child.childrenCancel = context.WithCancel(child.ctx)
 
@@ -308,13 +319,21 @@ func (p *Process) main() {
 			// We only propagate the error to the parent if we are not going to
 			// restart and if we are linked to it.
 			if !p.Options.RestartOnError && !p.Options.Unlinked {
-				p.parentErrChan <- err
+				// The parent may have read an error for another child and is
+				// canceling the children context (the one p.ctx derives from).
+				// In that case there is nothing to do but return.
+				select {
+				case p.parentErrChan <- err:
+				case <-p.ctx.Done():
+				}
 			}
 		}
 
 		select {
 		case <-p.ctx.Done():
-			if newState != ProcessStateTerminated {
+			terminated := newState == ProcessStateTerminated
+			restarting := newState == ProcessStateRestarting
+			if !(restarting || terminated) {
 				newState = ProcessStateStopping
 			}
 
@@ -331,9 +350,10 @@ func (p *Process) main() {
 }
 
 func (p *Process) onStarting() (state ProcessState, err error) {
+	p.mutex.Lock()
 	p.childrenCtx, p.childrenCancel = context.WithCancel(p.ctx)
-	p.errChan = make(chan error)
 	p.err = nil
+	p.mutex.Unlock()
 
 	defer func() {
 		if v := recover(); v != nil {
@@ -373,17 +393,32 @@ func (p *Process) onRunning() (state ProcessState, err error) {
 }
 
 func (p *Process) onStopping() ProcessState {
+	p.mutex.RLock()
 	p.childrenCancel()
+	p.mutex.RUnlock()
 	p.childrenWg.Wait()
-	close(p.errChan)
 
-	p.Behavior.Stop()
+	func() {
+		defer func() {
+			if v := recover(); v != nil {
+				msg := utils.RecoverValueString(v)
+				trace := utils.StackTrace(2, 20, true)
+
+				p.Log.Error("process error while stopping: %v",
+					utils.NewPanicError(msg, trace))
+			}
+		}()
+
+		p.Behavior.Stop()
+	}()
 
 	p.mutex.RLock()
 	pErr := p.err
 	p.mutex.RUnlock()
 
-	if pErr != nil && p.Options.RestartOnError {
+	// We check p.ctx.Err() because we do not restart if the context is
+	// canceled.
+	if pErr != nil && p.Options.RestartOnError && p.ctx.Err() == nil {
 		return ProcessStateRestarting
 	}
 
