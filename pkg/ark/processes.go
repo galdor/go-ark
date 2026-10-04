@@ -16,11 +16,11 @@ import (
 type ProcessState string
 
 const (
-	ProcessStateStarting   = "starting"
-	ProcessStateRunning    = "running"
-	ProcessStateStopping   = "stopping"
-	ProcessStateRestarting = "restarting"
-	ProcessStateTerminated = "terminated"
+	ProcessStateStarting   ProcessState = "starting"
+	ProcessStateRunning    ProcessState = "running"
+	ProcessStateStopping   ProcessState = "stopping"
+	ProcessStateRestarting ProcessState = "restarting"
+	ProcessStateTerminated ProcessState = "terminated"
 )
 
 type ProcessStartError struct {
