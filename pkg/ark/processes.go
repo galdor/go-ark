@@ -24,11 +24,12 @@ const (
 )
 
 type ProcessStartError struct {
-	Err error
+	ProcessName string
+	Err         error
 }
 
 func (err *ProcessStartError) Error() string {
-	return fmt.Sprintf("cannot start process: %v", err.Err)
+	return fmt.Sprintf("cannot start process %q: %v", err.ProcessName, err.Err)
 }
 
 func (err *ProcessStartError) Unwrap() error {
@@ -36,11 +37,12 @@ func (err *ProcessStartError) Unwrap() error {
 }
 
 type ProcessMainError struct {
-	Err error
+	ProcessName string
+	Err         error
 }
 
 func (err *ProcessMainError) Error() string {
-	return fmt.Sprintf("process error: %v", err.Err)
+	return fmt.Sprintf("error running process %q: %v", err.ProcessName, err.Err)
 }
 
 func (err *ProcessMainError) Unwrap() error {
@@ -295,8 +297,11 @@ func (p *Process) main() {
 
 	go func() {
 		select {
-		case <-p.errChan:
+		case err := <-p.errChan:
 			p.Stop()
+			<-p.terminated
+			p.maybePropagateError(err)
+
 		case <-p.Stopping():
 			return
 		}
@@ -316,13 +321,13 @@ func (p *Process) main() {
 		case ProcessStateStarting:
 			newState, err = p.onStarting()
 			if err != nil {
-				err = &ProcessStartError{Err: err}
+				err = p.startError(err)
 			}
 
 		case ProcessStateRunning:
 			newState, err = p.onRunning()
 			if err != nil {
-				err = &ProcessMainError{Err: err}
+				err = p.mainError(err)
 			}
 
 		case ProcessStateStopping:
@@ -337,18 +342,7 @@ func (p *Process) main() {
 
 		if err != nil {
 			p.Log.Error("%v", err)
-
-			// We only propagate the error to the parent if we are not going to
-			// restart and if we are linked to it.
-			if !p.Options.RestartOnError && !p.Options.Unlinked {
-				// The parent may have read an error for another child and is
-				// canceling the children context (the one p.ctx derives from).
-				// In that case there is nothing to do but return.
-				select {
-				case p.parentErrChan <- err:
-				case <-p.ctx.Done():
-				}
-			}
+			p.maybePropagateError(err)
 		}
 
 		// If we are stopping, either definitely or just for this run, we
@@ -471,5 +465,33 @@ func (p *Process) onRestarting() ProcessState {
 		return ProcessStateStarting
 	case <-p.Stopping():
 		return ProcessStateTerminated
+	}
+}
+
+func (p *Process) maybePropagateError(err error) {
+	// We only propagate the error to the parent if we are not going to
+	// restart and if we are linked to it.
+	if !p.Options.RestartOnError && !p.Options.Unlinked {
+		// The parent may have read an error for another child and is
+		// canceling the children context (the one p.ctx derives from).
+		// In that case there is nothing to do but return.
+		select {
+		case p.parentErrChan <- err:
+		case <-p.ctx.Done():
+		}
+	}
+}
+
+func (p *Process) startError(err error) *ProcessStartError {
+	return &ProcessStartError{
+		ProcessName: p.Name,
+		Err:         err,
+	}
+}
+
+func (p *Process) mainError(err error) *ProcessMainError {
+	return &ProcessMainError{
+		ProcessName: p.Name,
+		Err:         err,
 	}
 }
