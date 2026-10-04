@@ -13,7 +13,8 @@ type Backoff struct {
 	Factor    float64
 	Jitter    float64
 
-	delay float64
+	delay      float64
+	lastUpdate time.Time
 }
 
 func NewBackoff(baseDelay, maxDelay, factor, jitter float64) *Backoff {
@@ -39,7 +40,8 @@ func NewBackoff(baseDelay, maxDelay, factor, jitter float64) *Backoff {
 		Factor:    factor,
 		Jitter:    jitter,
 
-		delay: baseDelay,
+		delay:      baseDelay,
+		lastUpdate: time.Now(),
 	}
 }
 
@@ -48,14 +50,20 @@ func (b *Backoff) Reset() {
 }
 
 func (b *Backoff) Delay() time.Duration {
-	delay := b.delay
+	now := time.Now()
 
-	newDelay := b.delay * b.Factor
-	minDelay := newDelay * (1.0 - b.Jitter)
-	maxDelay := newDelay * (1.0 + b.Jitter)
-	newDelay = minDelay + rand.Float64()*(maxDelay-minDelay)
+	resetDelay := 5.0 * b.MaxDelay
+	if now.Sub(b.lastUpdate) >= time.Duration(resetDelay*float64(time.Second)) {
+		b.delay = b.BaseDelay
+	} else {
+		newDelay := b.delay * b.Factor
+		minDelay := newDelay * (1.0 - b.Jitter)
+		maxDelay := newDelay * (1.0 + b.Jitter)
+		newDelay = minDelay + rand.Float64()*(maxDelay-minDelay)
+		b.delay = min(newDelay, b.MaxDelay)
+	}
 
-	b.delay = min(newDelay, b.MaxDelay)
+	b.lastUpdate = now
 
-	return time.Duration(delay * float64(time.Second))
+	return time.Duration(b.delay * float64(time.Second))
 }
