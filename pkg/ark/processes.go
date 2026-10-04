@@ -58,7 +58,7 @@ type Process struct {
 	Name     string
 	Behavior ProcessBehavior
 	Log      *log.Logger
-	Opts     *ProcessOptions
+	Options  *ProcessOptions
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -105,7 +105,7 @@ func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
 		Name:     name,
 		Behavior: behavior,
 		Log:      logger,
-		Opts:     &opts,
+		Options:  &opts,
 
 		ctx:    ctx,
 		cancel: cancel,
@@ -209,7 +209,7 @@ func (p *Process) newChild(
 		Name:     name,
 		Behavior: behavior,
 		Log:      logger,
-		Opts:     opts,
+		Options:  opts,
 
 		parentErrChan: p.errChan,
 
@@ -307,7 +307,7 @@ func (p *Process) main() {
 
 			// We only propagate the error to the parent if we are not going to
 			// restart and if we are linked to it.
-			if !p.Opts.RestartOnError && !p.Opts.Unlinked {
+			if !p.Options.RestartOnError && !p.Options.Unlinked {
 				p.parentErrChan <- err
 			}
 		}
@@ -383,7 +383,7 @@ func (p *Process) onStopping() ProcessState {
 	pErr := p.err
 	p.mutex.RUnlock()
 
-	if pErr != nil && p.Opts.RestartOnError {
+	if pErr != nil && p.Options.RestartOnError {
 		return ProcessStateRestarting
 	}
 
@@ -391,7 +391,7 @@ func (p *Process) onStopping() ProcessState {
 }
 
 func (p *Process) onRestarting() ProcessState {
-	delay := p.Opts.RestartBackoff.Delay()
+	delay := p.Options.RestartBackoff.Delay()
 
 	timer := time.NewTimer(delay)
 	defer timer.Stop()
