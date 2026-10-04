@@ -10,9 +10,25 @@ import (
 
 const DefaultScopeWidth = 32
 
+type Color int
+
+var (
+	ColorBlack   = Color(0)
+	ColorRed     = Color(1)
+	ColorGreen   = Color(2)
+	ColorYellow  = Color(3)
+	ColorBlue    = Color(4)
+	ColorMagenta = Color(5)
+	ColorCyan    = Color(6)
+	ColorWhite   = Color(7)
+	ColorDefault = Color(9)
+)
+
 type TerminalHandlerCfg struct {
-	Level      slog.Leveler `json:"level,omitempty"`
-	ScopeWidth int          `json:"scope_width,omitempty"`
+	Level        slog.Leveler `json:"level,omitempty"`
+	DisableColor bool         `json:"disable_color,omitempty"`
+	ForceColor   bool         `json:"force_color,omitempty"`
+	ScopeWidth   int          `json:"scope_width,omitempty"`
 }
 
 type TerminalHandler struct {
@@ -21,6 +37,7 @@ type TerminalHandler struct {
 	attributes Attributes
 	scope      string
 	mutex      *sync.Mutex // used to write to os.Stderr
+	color      bool
 }
 
 func NewTerminalHandler(cfg *TerminalHandlerCfg) *TerminalHandler {
@@ -28,7 +45,19 @@ func NewTerminalHandler(cfg *TerminalHandlerCfg) *TerminalHandler {
 		cfg.ScopeWidth = DefaultScopeWidth
 	}
 
-	return &TerminalHandler{Cfg: cfg, mutex: &sync.Mutex{}}
+	isCharDev, err := isCharDevice(os.Stderr)
+	if err != nil {
+		// If we cannot check for some reason, assume it is a character
+		// device for color purposes. Better to be conservative.
+		isCharDev = true
+	}
+	color := (!cfg.DisableColor && isCharDev) || cfg.ForceColor
+
+	return &TerminalHandler{
+		Cfg:   cfg,
+		mutex: &sync.Mutex{},
+		color: color,
+	}
 }
 
 func (h *TerminalHandler) Enabled(ctx context.Context, level slog.Level) bool {
@@ -70,13 +99,22 @@ func (h *TerminalHandler) WithGroup(name string) slog.Handler {
 func (h *TerminalHandler) Handle(ctx context.Context, r slog.Record) error {
 	buf := make([]byte, 0, 1024)
 
-	buf = fmt.Appendf(buf, "%-7s", LevelString(r.Level))
+	baseColor := ColorDefault
+	if r.Level >= slog.LevelError {
+		baseColor = ColorRed
+	} else if r.Level >= slog.LevelWarn {
+		baseColor = ColorYellow
+	} else {
+		baseColor = ColorDefault
+	}
+
+	buf = append(buf, h.colorize(baseColor, LevelString(r.Level), 7)...)
 	buf = append(buf, "  "...)
 
-	buf = fmt.Appendf(buf, "%-*s", h.Cfg.ScopeWidth, h.scope)
+	buf = append(buf, h.colorize(ColorGreen, h.scope, h.Cfg.ScopeWidth)...)
 	buf = append(buf, "  "...)
 
-	buf = append(buf, r.Message...)
+	buf = append(buf, h.colorize(baseColor, r.Message, 0)...)
 	buf = append(buf, '\n')
 
 	attributes := h.recordAttributes(r)
@@ -89,7 +127,7 @@ func (h *TerminalHandler) Handle(ctx context.Context, r slog.Record) error {
 			}
 
 			buf = append(buf, ' ')
-			buf = append(buf, a.Key...)
+			buf = append(buf, h.colorize(ColorBlue, a.Key, 0)...)
 			buf = append(buf, '=')
 			buf = append(buf, a.Value...)
 
@@ -125,4 +163,26 @@ func (h *TerminalHandler) recordAttributes(r slog.Record) Attributes {
 	attributes.SortAndDeduplicate()
 
 	return attributes
+}
+
+func (h *TerminalHandler) colorize(color Color, s string, pad int) string {
+	if !h.color {
+		return s
+	}
+
+	if pad != 0 {
+		s = fmt.Sprintf("%-*s", pad, s)
+	}
+
+	// Yes we only support ANSI terminals, no we do not care.
+	return fmt.Sprintf("\033[%dm%s\033[0m", 30+int(color), s)
+}
+
+func isCharDevice(file *os.File) (bool, error) {
+	info, err := file.Stat()
+	if err != nil {
+		return false, err
+	}
+
+	return info.Mode()&os.ModeCharDevice != 0, nil
 }
