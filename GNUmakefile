@@ -13,4 +13,7 @@ vet:
 test:
 	go test -race -count 1 -timeout 10s $(CURDIR)/...
 
-.PHONY: all build check vet test
+clean:
+	$(RM) $(wildcard bin/*)
+
+.PHONY: all build check vet test clean
