@@ -84,7 +84,7 @@ func (s *Server) Start(p *ark.Process) error {
 
 	listener, err := net.Listen("tcp", s.Cfg.Address)
 	if err != nil {
-		// TODO unwrap listen
+		err = common.UnwrapNetOpError(err, "listen")
 		return fmt.Errorf("cannot listen on %s: %w", s.Cfg.Address, err)
 	}
 	s.listener = listener
