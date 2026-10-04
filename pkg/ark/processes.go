@@ -60,9 +60,18 @@ type Process struct {
 	Log      *log.Logger
 	Options  *ProcessOptions
 
+	// Controls the full lifecycle of the process. The process stops with all
+	// its children when it is canceled and cannot be restarted.
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	// Controls the lifecycle of one run (start/main/stop) for the process. The
+	// process stops with all its children when it is canceled and can be
+	// restarted afterwards.
+	runCtx    context.Context
+	runCancel context.CancelFunc
+
+	// Controls the lifecycle of the children.
 	childrenCtx    context.Context
 	childrenCancel context.CancelFunc
 	childrenWg     sync.WaitGroup
@@ -70,6 +79,8 @@ type Process struct {
 	parentErrChan chan<- error
 	errChan       chan error
 
+	// Note that mutex also protects runCtx, runCancel, childrenCtx and
+	// childrenCancel.
 	mutex sync.RWMutex
 	state ProcessState
 	err   error
@@ -94,7 +105,8 @@ func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
 	logger = logger.With("scope", name)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	childrenCtx, childrenCancel := context.WithCancel(ctx)
+	runCtx, runCancel := context.WithCancel(ctx)
+	childrenCtx, childrenCancel := context.WithCancel(runCtx)
 
 	errChan := make(chan error)
 
@@ -108,6 +120,9 @@ func Run(name string, behavior ProcessBehavior, logger *log.Logger) error {
 
 		ctx:    ctx,
 		cancel: cancel,
+
+		runCtx:    runCtx,
+		runCancel: runCancel,
 
 		childrenCtx:    childrenCtx,
 		childrenCancel: childrenCancel,
@@ -228,7 +243,8 @@ func (p *Process) newChild(
 	// Note that the parent must hold p.mutex. Not a problem since newChild is
 	// only called by AddChildWithOptions.
 	child.ctx, child.cancel = context.WithCancel(p.childrenCtx)
-	child.childrenCtx, child.childrenCancel = context.WithCancel(child.ctx)
+	child.runCtx, child.runCancel = context.WithCancel(child.ctx)
+	child.childrenCtx, child.childrenCancel = context.WithCancel(child.runCtx)
 
 	return &child
 }
@@ -238,11 +254,17 @@ func (p *Process) Stop() {
 }
 
 func (p *Process) Context() context.Context {
-	return p.ctx
+	p.mutex.RLock()
+	runCtx := p.runCtx
+	p.mutex.RUnlock()
+	return runCtx
 }
 
 func (p *Process) Stopping() <-chan struct{} {
-	return p.ctx.Done()
+	p.mutex.RLock()
+	runCtx := p.runCtx
+	p.mutex.RUnlock()
+	return runCtx.Done()
 }
 
 func (p *Process) run(wg *sync.WaitGroup) {
@@ -329,11 +351,23 @@ func (p *Process) main() {
 			}
 		}
 
+		// If we are stopping, either definitely or just for this run, we
+		// directly go and call the Stop method of the behavior.
+		p.mutex.RLock()
+		runCtx := p.runCtx
+		p.mutex.RUnlock()
+
+		stop := newState != ProcessStateTerminated &&
+			newState != ProcessStateRestarting
+
 		select {
 		case <-p.ctx.Done():
-			terminated := newState == ProcessStateTerminated
-			restarting := newState == ProcessStateRestarting
-			if !(restarting || terminated) {
+			if stop {
+				newState = ProcessStateStopping
+			}
+
+		case <-runCtx.Done():
+			if stop {
 				newState = ProcessStateStopping
 			}
 
@@ -351,7 +385,8 @@ func (p *Process) main() {
 
 func (p *Process) onStarting() (state ProcessState, err error) {
 	p.mutex.Lock()
-	p.childrenCtx, p.childrenCancel = context.WithCancel(p.ctx)
+	p.runCtx, p.runCancel = context.WithCancel(p.ctx)
+	p.childrenCtx, p.childrenCancel = context.WithCancel(p.runCtx)
 	p.err = nil
 	p.mutex.Unlock()
 

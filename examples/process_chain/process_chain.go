@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	nethttp "net/http"
 	_ "net/http/pprof"
 	"time"
@@ -27,7 +28,9 @@ func (e *Example) Start(p *ark.Process) error {
 	e.Log.Info("starting")
 
 	if e.Level < 3 {
-		e.process.AddChild("example", NewExample(e.Level+1))
+		backoff := ark.NewBackoff(0.25, 1.0, 1.5, 0.1)
+		e.process.AddChildWithOptions("example", NewExample(e.Level+1),
+			ark.ProcessOptions{RestartOnError: true, RestartBackoff: backoff})
 	}
 
 	return nil
@@ -53,6 +56,11 @@ func (e *Example) Main() error {
 			e.Log.Info("timer expired")
 			e.process.Stop()
 			return nil
+
+		case <-time.After(time.Second):
+			if e.Level == 2 {
+				return errors.New("test error")
+			}
 		}
 	}
 
