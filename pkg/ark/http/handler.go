@@ -27,10 +27,10 @@ type Handler struct {
 	Request        *http.Request
 	ResponseWriter http.ResponseWriter
 
-	process     *ark.Process
-	startTime   time.Time
-	requestTime *time.Duration
-	errorCode   string
+	process      *ark.Process
+	startTime    time.Time
+	responseTime *time.Duration
+	errorCode    string
 }
 
 func (h *Handler) Start(p *ark.Process) error {
@@ -51,7 +51,7 @@ func (h *Handler) Main() error {
 }
 
 func (h *Handler) Stop() {
-	h.requestTime = new(time.Since(h.startTime))
+	h.responseTime = new(time.Since(h.startTime))
 
 	h.logRequest()
 }
@@ -66,7 +66,7 @@ func (h *Handler) logRequest() {
 
 	attrs := []any{
 		"event", "http_server.request",
-		"time", h.requestTime.Microseconds(),
+		"response_time", h.responseTime.Microseconds(),
 	}
 
 	if h.errorCode != "" {
@@ -84,7 +84,7 @@ func (h *Handler) logRequest() {
 
 	h.Log.InfoData(attrs, "%s %s %s %s",
 		req.Method, req.URL.Path, statusString,
-		utils.FormatSeconds(h.requestTime.Seconds(), 1))
+		utils.FormatSeconds(h.responseTime.Seconds(), 1))
 }
 
 func (h *Handler) Reply(status int, r io.Reader) {
