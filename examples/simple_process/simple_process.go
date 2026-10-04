@@ -18,12 +18,13 @@ func (e *Example) Start(p *ark.Process) error {
 	e.Log = p.Log
 	e.process = p
 
-	e.Log.Info("start")
+	e.Log.Info("starting")
+
 	return nil
 }
 
 func (e *Example) Stop() {
-	e.Log.Info("stop")
+	e.Log.Info("stopping")
 }
 
 func (e *Example) Main() error {
