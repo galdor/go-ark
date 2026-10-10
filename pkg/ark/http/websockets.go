@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -42,6 +43,10 @@ func (h *WebsocketHandler) Main() error {
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				h.Log.Info("connection closed")
+				return nil
+			}
+
+			if errors.Is(err, context.Canceled) {
 				return nil
 			}
 
