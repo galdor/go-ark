@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -166,7 +165,7 @@ func (s *Server) RouteWithOptions(
 				msg := fmt.Sprintf("panic: %s\n%s", valueString, trace)
 				msg = strings.TrimRight(msg, "\n")
 
-				if _, err := w.Write(nil); errors.Is(err, http.ErrHijacked) {
+				if h.ConnectionHijacked() {
 					h.Log.Error("%s", msg)
 					return
 				}

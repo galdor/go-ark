@@ -52,8 +52,6 @@ func (h *WebsocketHandler) Main() error {
 			return err
 		}
 	}
-
-	return nil
 }
 
 func (h *Handler) HandleWebsocketUpgrade(behavior WebsocketHandlerBehavior) {
@@ -64,6 +62,8 @@ func (h *Handler) HandleWebsocketUpgrade(behavior WebsocketHandlerBehavior) {
 		return
 	}
 	defer conn.CloseNow()
+
+	h.onRequestHandled()
 
 	handler := &WebsocketHandler{
 		httpHandler: h,

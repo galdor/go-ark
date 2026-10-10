@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -56,9 +57,20 @@ func (h *Handler) Main() error {
 }
 
 func (h *Handler) Stop() {
+	if !h.ConnectionHijacked() {
+		h.onRequestHandled()
+	}
+}
+
+func (h *Handler) onRequestHandled() {
 	h.responseTime = new(time.Since(h.startTime))
 
 	h.logRequest()
+}
+
+func (h *Handler) ConnectionHijacked() bool {
+	_, err := h.ResponseWriter.Write(nil)
+	return errors.Is(err, http.ErrHijacked)
 }
 
 func (h *Handler) logRequest() {
