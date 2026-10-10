@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -160,10 +161,17 @@ func (s *Server) RouteWithOptions(
 
 		defer func() {
 			if v := recover(); v != nil {
-				msg := utils.RecoverValueString(v)
+				valueString := utils.RecoverValueString(v)
 				trace := utils.StackTrace(2, 20, true)
+				msg := fmt.Sprintf("panic: %s\n%s", valueString, trace)
+				msg = strings.TrimRight(msg, "\n")
 
-				h.ReplyInternalError(500, "panic: %s\n%s", msg, trace)
+				if _, err := w.Write(nil); errors.Is(err, http.ErrHijacked) {
+					h.Log.Error("%s", msg)
+					return
+				}
+
+				h.ReplyInternalError(500, "%s", msg)
 			}
 		}()
 

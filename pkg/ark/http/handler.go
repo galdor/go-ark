@@ -164,7 +164,8 @@ func (h *Handler) ReplyErrorData(
 }
 
 func (h *Handler) ReplyInternalError(status int, format string, args ...any) {
-	msg := strings.TrimRight(fmt.Sprintf(format, args...), "\n")
+	msg := fmt.Sprintf(format, args...)
+
 	h.Log.Error("internal error: %s", msg)
 
 	if h.Server.Cfg.HideInternalErrors {
