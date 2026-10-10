@@ -42,7 +42,6 @@ func (h *WebsocketHandler) Main() error {
 		msgType, msgData, err := h.Conn.Read(ctx)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				h.Log.Info("connection closed")
 				return nil
 			}
 
