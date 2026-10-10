@@ -54,40 +54,27 @@ func (e *Example) hPanic(h *http.Handler) {
 }
 
 func (e *Example) hWebsocket(h *http.Handler) {
-	h.HandleWebsocketUpgrade(&WebsocketHandler{})
+	h.HandleWebsocketUpgrade(&WebsocketEcho{})
 }
 
-type WebsocketHandler struct {
+type WebsocketEcho struct {
 	Log     *log.Logger
-	process *ark.Process
-	conn    *websocket.Conn
+	Handler *http.WebsocketHandler
 }
 
-func (h *WebsocketHandler) Start(
-	p *ark.Process, hh *http.Handler, conn *websocket.Conn,
-) error {
-	h.Log = p.Log
-	h.process = p
-	h.conn = conn
+func (e *WebsocketEcho) Start(h *http.WebsocketHandler) error {
+	e.Log = h.Log
+	e.Handler = h
 	return nil
 }
 
-func (h *WebsocketHandler) Stop() {
+func (e *WebsocketEcho) Stop() {
 }
 
-func (h *WebsocketHandler) ProcessMessage(
-	msgType websocket.MessageType, msgData []byte,
+func (e *WebsocketEcho) ProcessMessage(
+	msgType websocket.MessageType, data []byte,
 ) error {
-	ctx := h.process.Context()
-
-	response := fmt.Sprintf("received %d byte message", len(msgData))
-
-	err := h.conn.Write(ctx, websocket.MessageText, []byte(response))
-	if err != nil {
-		return fmt.Errorf("cannot write connection: %w", err)
-	}
-
-	return nil
+	return e.Handler.WriteTextMessage(data)
 }
 
 func main() {

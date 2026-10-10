@@ -12,34 +12,34 @@ import (
 )
 
 type WebsocketHandlerBehavior interface {
-	Start(*ark.Process, *Handler, *websocket.Conn) error
+	Start(*WebsocketHandler) error
 	Stop()
 	ProcessMessage(websocket.MessageType, []byte) error
 }
 
 type WebsocketHandler struct {
 	Log         *log.Logger
-	process     *ark.Process
-	httpHandler *Handler
-	conn        *websocket.Conn
-	behavior    WebsocketHandlerBehavior
+	Process     *ark.Process
+	Behavior    WebsocketHandlerBehavior
+	HTTPHandler *Handler
+	Conn        *websocket.Conn
 }
 
 func (h *WebsocketHandler) Start(p *ark.Process) error {
 	h.Log = p.Log
-	h.process = p
+	h.Process = p
 
-	return h.behavior.Start(p, h.httpHandler, h.conn)
+	return h.Behavior.Start(h)
 }
 
 func (h *WebsocketHandler) Stop() {
 }
 
 func (h *WebsocketHandler) Main() error {
-	ctx := h.process.Context()
+	ctx := h.Process.Context()
 
 	for {
-		msgType, msgData, err := h.conn.Read(ctx)
+		msgType, msgData, err := h.Conn.Read(ctx)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				h.Log.Info("connection closed")
@@ -53,10 +53,41 @@ func (h *WebsocketHandler) Main() error {
 			return fmt.Errorf("cannot read connection: %w", err)
 		}
 
-		if err := h.behavior.ProcessMessage(msgType, msgData); err != nil {
+		if err := h.Behavior.ProcessMessage(msgType, msgData); err != nil {
 			return err
 		}
 	}
+}
+
+func (h *WebsocketHandler) Context() context.Context {
+	return h.Process.Context()
+}
+
+func (h *WebsocketHandler) WriteBinaryMessage(data []byte) error {
+	err := h.Conn.Write(h.Context(), websocket.MessageBinary, data)
+	if err != nil {
+		err = fmt.Errorf("cannot write message: %w", err)
+		h.Log.Error("%v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (h *WebsocketHandler) WriteTextMessage(data []byte) error {
+	err := h.Conn.Write(h.Context(), websocket.MessageText, data)
+	if err != nil {
+		err = fmt.Errorf("cannot write message: %w", err)
+		h.Log.Error("%v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (h *WebsocketHandler) FormatTextMessage(format string, args ...any) error {
+	data := fmt.Sprintf(format, args)
+	return h.WriteTextMessage([]byte(data))
 }
 
 func (h *Handler) HandleWebsocketUpgrade(behavior WebsocketHandlerBehavior) {
@@ -71,9 +102,9 @@ func (h *Handler) HandleWebsocketUpgrade(behavior WebsocketHandlerBehavior) {
 	h.onRequestHandled()
 
 	handler := &WebsocketHandler{
-		httpHandler: h,
-		conn:        conn,
-		behavior:    behavior,
+		Behavior:    behavior,
+		HTTPHandler: h,
+		Conn:        conn,
 	}
 
 	processOpts := ark.ProcessOptions{Inline: true, Unlinked: true}
