@@ -27,6 +27,11 @@ type Handler struct {
 	Request        *http.Request
 	ResponseWriter http.ResponseWriter
 
+	Method        string
+	PathPattern   string
+	RouteId       string
+	ClientAddress string // optional
+
 	process      *ark.Process
 	startTime    time.Time
 	responseTime *time.Duration
@@ -66,7 +71,7 @@ func (h *Handler) logRequest() {
 
 	attrs := []any{
 		"event", "http_server.request",
-		"response_time", h.responseTime.Microseconds(),
+		"http.response_time", h.responseTime.Microseconds(),
 	}
 
 	if h.errorCode != "" {
@@ -78,7 +83,7 @@ func (h *Handler) logRequest() {
 	if w.Status != 0 {
 		statusString = strconv.Itoa(w.Status)
 
-		attrs = append(attrs, "status")
+		attrs = append(attrs, "http.status")
 		attrs = append(attrs, w.Status)
 	}
 

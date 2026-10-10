@@ -27,6 +27,7 @@ func (e *Example) Start(p *ark.Process) error {
 		return fmt.Errorf("cannot create HTTP server: %v", err)
 	}
 
+	httpServer.Route("/ping", "GET", e.hPing)
 	httpServer.Route("/panic", "GET", e.hPanic)
 
 	e.process.AddChild("http_server", httpServer)
@@ -40,6 +41,10 @@ func (e *Example) Main() error {
 }
 
 func (e *Example) Stop() {
+}
+
+func (e *Example) hPing(h *http.Handler) {
+	h.ReplyText(200, "pong\n")
 }
 
 func (e *Example) hPanic(h *http.Handler) {

@@ -193,30 +193,50 @@ func (s *Server) finalizeHandler(
 	h *Handler, req *http.Request, pathPattern, method string,
 	routeFunc RouteFunc, options *RouteOptions,
 ) {
-	// TODO handler data
-
 	h.Options = options
 	h.Request = req // the request may have been modified by the muxer
-	// h.Query = req.URL.Query()
 
-	// h.Method = method
-	// h.PathPattern = pathPattern
-	// h.RouteId = s.RouteId(method, pathPattern, options)
+	h.Method = method
+	h.PathPattern = pathPattern
+	h.RouteId = s.RouteId(method, pathPattern, options)
+	h.ClientAddress = requestClientAddress(req)
 
-	// h.ClientAddress = requestClientAddress(req)
-	// h.RequestId = requestId(req)
+	var attrs []any
 
-	// if h.RouteId != "" {
-	// 	h.Log.Data["route"] = h.RouteId
-	// }
+	if h.RouteId != "" {
+		attrs = append(attrs, "http.route")
+		attrs = append(attrs, h.RouteId)
+	}
 
-	// if h.ClientAddress != "" {
-	// 	h.Log.Data["address"] = h.ClientAddress
-	// }
+	if h.ClientAddress != "" {
+		attrs = append(attrs, "http.client_address")
+		attrs = append(attrs, h.ClientAddress)
+	}
 
-	// if h.RequestId != "" {
-	// 	h.Log.Data["request_id"] = h.RequestId
-	// }
+	h.Log = h.Log.With(attrs...)
+}
+
+func (s *Server) RouteId(method, pathPattern string, options *RouteOptions) string {
+	if options.RouteId != "" {
+		return options.RouteId
+	}
+
+	if pathPattern == "" {
+		return ""
+	}
+
+	// We want "/foo/{$}" to have the route id "/foo" and "/{$}" to have the
+	// route id "/" and not "".
+	pathPattern = strings.TrimSuffix(pathPattern, "/{$}")
+	if pathPattern == "" {
+		pathPattern = "/"
+	}
+
+	if method == "" {
+		return ""
+	}
+
+	return pathPattern + " " + strings.ToUpper(method)
 }
 
 func TextErrorHandler(
@@ -271,6 +291,28 @@ func requestHandler(req *http.Request) *Handler {
 	}
 
 	return value.(*Handler)
+}
+
+func requestClientAddress(req *http.Request) string {
+	if v := req.Header.Get("X-Real-IP"); v != "" {
+		return v
+	}
+
+	if v := req.Header.Get("X-Forwarded-For"); v != "" {
+		i := strings.Index(v, ", ")
+		if i == -1 {
+			return v
+		}
+
+		return v[:i]
+	}
+
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return ""
+	}
+
+	return host
 }
 
 func RequestAcceptsText(req *http.Request) bool {
