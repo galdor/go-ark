@@ -40,12 +40,12 @@ type Handler struct {
 
 func (h *Handler) Start(p *ark.Process) error {
 	h.Log = p.Log
+	h.process = p
+	h.startTime = time.Now()
 
 	ctx := h.Request.Context()
 	ctx = context.WithValue(ctx, contextKeyHandler, h)
 	h.Request = h.Request.WithContext(ctx)
-
-	h.startTime = time.Now()
 
 	return nil
 }
