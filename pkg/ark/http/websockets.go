@@ -84,7 +84,7 @@ func (h *WebsocketHandler) WriteTextMessage(data []byte) error {
 }
 
 func (h *WebsocketHandler) FormatTextMessage(format string, args ...any) error {
-	data := fmt.Sprintf(format, args)
+	data := fmt.Sprintf(format, args...)
 	return h.WriteTextMessage([]byte(data))
 }
 
