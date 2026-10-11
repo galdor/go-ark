@@ -128,9 +128,28 @@ func (h *Handler) ReplyRedirect(status int, uri string) {
 
 func (h *Handler) ReplyText(status int, body string) {
 	header := h.ResponseWriter.Header()
-	header.Set("Content-Type", "text/plain; charset=UTF-8")
+	header.Set("Content-Type", "text/plain;charset=UTF-8")
 
 	h.Reply(status, strings.NewReader(body))
+}
+
+type Template interface {
+	ExecuteTemplate(io.Writer, string, any) error
+}
+
+func (h *Handler) ReplyTemplate(
+	status int, tpl Template, name string, data any,
+) {
+	header := h.ResponseWriter.Header()
+	header.Set("Content-Type", "text/html;charset=UTF-8")
+
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, name, data); err != nil {
+		h.ReplyInternalError(500, "cannot render template: %v", err)
+		return
+	}
+
+	h.Reply(status, &buf)
 }
 
 func (h *Handler) ReplyJSON(status int, value any) {
