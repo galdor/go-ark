@@ -1,4 +1,4 @@
-package utils
+package template
 
 import (
 	"cmp"
@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var TemplateFunctions = map[string]interface{}{
+var Functions = map[string]interface{}{
 	"env": os.Getenv,
 
 	"env2": func(name, defaultValue string) string {

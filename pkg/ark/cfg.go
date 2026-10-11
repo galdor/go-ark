@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
-	"text/template"
+	texttemplate "text/template"
 
-	"go.n16f.net/ark/pkg/ark/utils"
+	"go.n16f.net/ark/pkg/ark/template"
 	"go.n16f.net/ark/pkg/ark/yaml"
 )
 
@@ -33,9 +33,9 @@ func LoadCfg(filePath string, templateData, dest any) error {
 func RenderCfg(
 	filePath string, templateContent []byte, templateData any,
 ) ([]byte, error) {
-	tpl := template.New(filepath.Base(filePath))
+	tpl := texttemplate.New(filepath.Base(filePath))
 	tpl.Option("missingkey=error")
-	tpl.Funcs(utils.TemplateFunctions)
+	tpl.Funcs(template.Functions)
 
 	if _, err := tpl.Parse(string(templateContent)); err != nil {
 		return nil, fmt.Errorf("cannot parse template: %w", err)
