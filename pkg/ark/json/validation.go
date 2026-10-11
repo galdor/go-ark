@@ -5,7 +5,9 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
+	"os"
 	"reflect"
 	"strconv"
 
@@ -210,6 +212,30 @@ func checkObject(value any) bool {
 	}
 
 	return !reflect.ValueOf(value).IsZero()
+}
+
+func (v *Validator) CheckDirectoryPath(token any, path string) bool {
+	if !v.CheckStringNotEmpty(token, path) {
+		return false
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			v.AddError(token, "file_not_found", "file not found")
+			return false
+		}
+
+		v.AddError(token, "error", "cannot stat file %v", err)
+		return false
+	}
+
+	if !info.IsDir() {
+		v.AddError(token, "not_a_directory", "file is not a directory")
+		return false
+	}
+
+	return true
 }
 
 func pointerTokenString(token any) string {
