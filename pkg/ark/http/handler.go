@@ -186,3 +186,7 @@ func (h *Handler) ReplyInternalError(status int, format string, args ...any) {
 
 	h.ReplyError(status, "internal_error", "%s", msg)
 }
+
+func (h *Handler) ReplyNotImplemented(feature string) {
+	h.ReplyError(501, "not_implemented", "%s not implemented", feature)
+}
