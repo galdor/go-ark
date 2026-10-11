@@ -18,11 +18,10 @@ type WebsocketHandlerBehavior interface {
 }
 
 type WebsocketHandler struct {
-	Log         *log.Logger
-	Process     *ark.Process
-	Behavior    WebsocketHandlerBehavior
-	HTTPHandler *Handler
-	Conn        *websocket.Conn
+	Log      *log.Logger
+	Process  *ark.Process
+	Behavior WebsocketHandlerBehavior
+	Conn     *websocket.Conn
 }
 
 func (h *WebsocketHandler) Start(p *ark.Process) error {
@@ -101,9 +100,8 @@ func (h *Handler) HandleWebsocketUpgrade(behavior WebsocketHandlerBehavior) {
 	h.onRequestHandled()
 
 	handler := &WebsocketHandler{
-		Behavior:    behavior,
-		HTTPHandler: h,
-		Conn:        conn,
+		Behavior: behavior,
+		Conn:     conn,
 	}
 
 	processOpts := ark.ProcessOptions{Inline: true, Unlinked: true}
