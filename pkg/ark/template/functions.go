@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var Functions = map[string]interface{}{
+var Functions = map[string]any{
 	"env": os.Getenv,
 
 	"env2": func(name, defaultValue string) string {

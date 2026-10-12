@@ -19,11 +19,11 @@ func (err *PanicError) Error() string {
 	return fmt.Sprintf("panic: %s\n%s", err.Message, err.Trace)
 }
 
-func Panic(format string, args ...interface{}) {
+func Panic(format string, args ...any) {
 	panic(fmt.Sprintf(format, args...))
 }
 
-func RecoverValueString(value interface{}) (msg string) {
+func RecoverValueString(value any) (msg string) {
 	switch v := value.(type) {
 	case error:
 		msg = v.Error()
