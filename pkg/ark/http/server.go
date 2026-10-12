@@ -26,8 +26,9 @@ type contextKey struct{}
 type RouteFunc func(*Handler)
 
 type RouteOptions struct {
-	RouteId          string
-	DisableAccessLog bool
+	RouteId           string
+	MethodlessRouteId bool
+	DisableAccessLog  bool
 }
 
 type ErrorData any
@@ -232,18 +233,20 @@ func (s *Server) RouteId(method, pathPattern string, options *RouteOptions) stri
 		return ""
 	}
 
+	routeId := pathPattern
+
 	// We want "/foo/{$}" to have the route id "/foo" and "/{$}" to have the
 	// route id "/" and not "".
-	pathPattern = strings.TrimSuffix(pathPattern, "/{$}")
-	if pathPattern == "" {
-		pathPattern = "/"
+	routeId = strings.TrimSuffix(pathPattern, "/{$}")
+	if routeId == "" {
+		routeId = "/"
 	}
 
-	if method == "" {
-		return ""
+	if method == "" || options.MethodlessRouteId {
+		return routeId
 	}
 
-	return pathPattern + " " + strings.ToUpper(method)
+	return routeId + " " + strings.ToUpper(method)
 }
 
 func TextErrorHandler(
