@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
+	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +19,9 @@ import (
 	"go.n16f.net/ark/pkg/ark/log"
 	"go.n16f.net/ark/pkg/ark/utils"
 )
+
+var filePathCacheBustingRE = regexp.MustCompile(
+	`^(.+)\.(?:[a-z0-9]+)\.([A-Za-z0-9]{1,5})$`)
 
 var (
 	contextKeyHandler contextKey = struct{}{}
@@ -208,4 +214,45 @@ func (h *Handler) ReplyInternalError(status int, format string, args ...any) {
 
 func (h *Handler) ReplyNotImplemented(feature string) {
 	h.ReplyError(501, "not_implemented", "%s not implemented", feature)
+}
+
+func (h *Handler) ReplyFile(filePath string) {
+	matches := filePathCacheBustingRE.FindAllStringSubmatch(filePath, -1)
+	if len(matches) == 1 {
+		groups := matches[0][1:]
+		filePath = groups[0] + "." + groups[1]
+	}
+
+	info, err := os.Stat(filePath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			h.ReplyError(404, "file_not_found", "file not found")
+			return
+		}
+
+		h.ReplyInternalError(500, "cannot stat %q: %v", filePath, err)
+		return
+	}
+
+	if !info.Mode().IsRegular() {
+		h.ReplyError(400, "non_regular_file",
+			"%q is not a regular file", filePath)
+		return
+	}
+
+	modTime := info.ModTime()
+
+	body, err := os.Open(filePath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			h.ReplyError(404, "file_not_found", "file not found")
+			return
+		}
+
+		h.ReplyInternalError(500, "cannot open %q: %v", filePath, err)
+		return
+	}
+	defer body.Close()
+
+	http.ServeContent(h.ResponseWriter, h.Request, filePath, modTime, body)
 }
