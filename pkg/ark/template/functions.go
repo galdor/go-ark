@@ -21,4 +21,8 @@ var Functions = map[string]interface{}{
 	"split": func(sep, s string) []string {
 		return strings.Split(s, sep)
 	},
+
+	"join": func(ss []string, sep string) string {
+		return strings.Join(ss, sep)
+	},
 }
