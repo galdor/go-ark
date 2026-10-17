@@ -236,8 +236,7 @@ func (h *Handler) ReplyFile(filePath string) {
 	}
 
 	if !info.Mode().IsRegular() {
-		h.ReplyError(400, "non_regular_file",
-			"%q is not a regular file", filePath)
+		h.ReplyError(400, "non_regular_file", "file is not a regular file")
 		return
 	}
 
