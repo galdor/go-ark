@@ -189,6 +189,8 @@ func (h *Handler) ReplyJSONFast(status int, value any) {
 	header := h.ResponseWriter.Header()
 	header.Set("Content-Type", "application/json")
 
+	h.ResponseWriter.WriteHeader(status)
+
 	if err := json.EncodeTo(value, h.ResponseWriter); err != nil {
 		h.Log.Error("cannot write JSON response: %v", err)
 		h.ResponseWriter.WriteHeader(500)
