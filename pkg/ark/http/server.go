@@ -166,7 +166,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		ResponseWriter: NewResponseWriter(w),
 	}
 
-	processOpts := ark.ProcessOptions{Inline: true}
+	processOpts := ark.ProcessOptions{Inline: true, Unlinked: true}
 	s.process.AddChildWithOptions("handler", &h, processOpts)
 }
 
