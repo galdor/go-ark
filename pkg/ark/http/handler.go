@@ -107,7 +107,7 @@ func (h *Handler) logRequest() {
 	}
 
 	h.Log.InfoData(attrs, "%s %s %s %s",
-		req.Method, req.URL.Path, statusString,
+		req.Method, utils.EscapeNonPrintable(req.URL.Path), statusString,
 		utils.FormatSeconds(h.responseTime.Seconds(), 1))
 }
 
