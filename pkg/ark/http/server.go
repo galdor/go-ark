@@ -178,6 +178,8 @@ func (s *Server) Route(pathPattern, method string, routeFunc RouteFunc) {
 func (s *Server) RouteWithOptions(
 	pathPattern, method string, routeFunc RouteFunc, options RouteOptions,
 ) {
+	method = strings.ToUpper(method)
+
 	handlerFunc := func(w http.ResponseWriter, req *http.Request) {
 		h := requestHandler(req)
 		s.finalizeHandler(h, req, pathPattern, method, routeFunc, &options)
