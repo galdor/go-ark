@@ -172,17 +172,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) Route(pathPattern, method string, routeFunc RouteFunc) {
-	s.RouteWithOptions(pathPattern, method, routeFunc, RouteOptions{})
+	s.RouteWithOptions(pathPattern, method, routeFunc, nil)
 }
 
 func (s *Server) RouteWithOptions(
-	pathPattern, method string, routeFunc RouteFunc, options RouteOptions,
+	pathPattern, method string, routeFunc RouteFunc, opts *RouteOptions,
 ) {
 	method = strings.ToUpper(method)
 
 	handlerFunc := func(w http.ResponseWriter, req *http.Request) {
 		h := requestHandler(req)
-		s.finalizeHandler(h, req, pathPattern, method, routeFunc, &options)
+		s.finalizeHandler(h, req, pathPattern, method, routeFunc, opts)
 
 		defer func() {
 			if v := recover(); v != nil {
@@ -319,7 +319,7 @@ func (s *Server) hNotFound(w http.ResponseWriter, req *http.Request) {
 	h := requestHandler(req)
 	s.finalizeHandler(h, req, "", req.Method, nil, nil)
 
-	h.ReplyError(404, "http_route_not_found", "HTTP route not found")
+	h.ReplyError(404, "not_found", "not found")
 }
 
 func requestHandler(req *http.Request) *Handler {
