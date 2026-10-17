@@ -234,9 +234,9 @@ func (v *Validator) CheckNetworkAddress(token any, s string) bool {
 			v.AddError(token, "invalid_port_number",
 				"port number must be greater than 0")
 			return false
-		} else if port >= 65535 {
+		} else if port > 65535 {
 			v.AddError(token, "invalid_port_number",
-				"port number must be lower than 65535")
+				"port number must be lower or equal to 65535")
 			return false
 		}
 	}
