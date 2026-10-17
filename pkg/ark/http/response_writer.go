@@ -8,7 +8,8 @@ import (
 )
 
 type ResponseWriter struct {
-	Status int
+	Status   int
+	Hijacked bool
 
 	w nethttp.ResponseWriter
 }
@@ -40,7 +41,12 @@ func (w *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 			fmt.Errorf("response writer does not support connection hijacking")
 	}
 
-	return hijacker.Hijack()
+	conn, rw, err := hijacker.Hijack()
+	if err == nil {
+		w.Hijacked = true
+	}
+
+	return conn, rw, err
 }
 
 func (w *ResponseWriter) Flush() {

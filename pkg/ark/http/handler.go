@@ -76,8 +76,8 @@ func (h *Handler) onRequestHandled() {
 }
 
 func (h *Handler) ConnectionHijacked() bool {
-	_, err := h.ResponseWriter.Write(nil)
-	return errors.Is(err, http.ErrHijacked)
+	w := h.ResponseWriter.(*ResponseWriter)
+	return w.Hijacked
 }
 
 func (h *Handler) logRequest() {
