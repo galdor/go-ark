@@ -43,6 +43,10 @@ type TerminalHandler struct {
 }
 
 func NewTerminalHandler(cfg *TerminalHandlerCfg) *TerminalHandler {
+	if cfg.Level == nil {
+		cfg.Level = slog.LevelInfo
+	}
+
 	if cfg.ScopeWidth == 0 {
 		cfg.ScopeWidth = DefaultScopeWidth
 	}
