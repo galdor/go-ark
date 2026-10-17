@@ -162,6 +162,7 @@ func (s *Server) Main() error {
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	h := Handler{
 		Server:         s,
+		Options:        &RouteOptions{},
 		Request:        req,
 		ResponseWriter: NewResponseWriter(w),
 	}
@@ -223,12 +224,15 @@ func (s *Server) finalizeHandler(
 	h *Handler, req *http.Request, pathPattern, method string,
 	routeFunc RouteFunc, options *RouteOptions,
 ) {
-	h.Options = options
+	if options != nil {
+		h.Options = options
+	}
+
 	h.Request = req // the request may have been modified by the muxer
 
 	h.Method = method
 	h.PathPattern = pathPattern
-	h.RouteId = s.RouteId(method, pathPattern, options)
+	h.RouteId = s.RouteId(method, pathPattern, h.Options)
 	h.ClientAddress = s.requestClientAddress(req)
 
 	var attrs []any
@@ -311,7 +315,7 @@ func AdaptativeErrorHandler(
 
 func (s *Server) hNotFound(w http.ResponseWriter, req *http.Request) {
 	h := requestHandler(req)
-	s.finalizeHandler(h, req, "", req.Method, nil, &RouteOptions{})
+	s.finalizeHandler(h, req, "", req.Method, nil, nil)
 
 	h.ReplyError(404, "http_route_not_found", "HTTP route not found")
 }
