@@ -25,6 +25,10 @@ func (w *ResponseWriter) Header() nethttp.Header {
 }
 
 func (w *ResponseWriter) Write(data []byte) (int, error) {
+	if w.Status == 0 {
+		w.Status = 200
+	}
+
 	return w.w.Write(data)
 }
 
