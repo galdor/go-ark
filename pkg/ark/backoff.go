@@ -55,15 +55,17 @@ func (b *Backoff) Delay() time.Duration {
 	resetDelay := 5.0 * b.MaxDelay
 	if now.Sub(b.lastUpdate) >= time.Duration(resetDelay*float64(time.Second)) {
 		b.delay = b.BaseDelay
-	} else {
-		newDelay := b.delay * b.Factor
-		minDelay := newDelay * (1.0 - b.Jitter)
-		maxDelay := newDelay * (1.0 + b.Jitter)
-		newDelay = minDelay + rand.Float64()*(maxDelay-minDelay)
-		b.delay = min(newDelay, b.MaxDelay)
 	}
+
+	delay := b.delay
+
+	newDelay := b.delay * b.Factor
+	minDelay := newDelay * (1.0 - b.Jitter)
+	maxDelay := newDelay * (1.0 + b.Jitter)
+	newDelay = minDelay + rand.Float64()*(maxDelay-minDelay)
+	b.delay = min(newDelay, b.MaxDelay)
 
 	b.lastUpdate = now
 
-	return time.Duration(b.delay * float64(time.Second))
+	return time.Duration(delay * float64(time.Second))
 }
