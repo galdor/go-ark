@@ -1,11 +1,11 @@
 package template
 
 import (
-	"errors"
 	"fmt"
 	htmltemplate "html/template"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	texttemplate "text/template"
 
@@ -34,9 +34,14 @@ func LoadTemplates(
 				return nil
 			}
 
-			start := len(dirPath) + 1
-			end := len(virtualPath) - len(".gotpl")
-			templateName := virtualPath[start:end]
+			relPath, err := filepath.Rel(dirPath, virtualPath)
+			if err != nil {
+				return fmt.Errorf("cannot compute relative path of %q: %w",
+					virtualPath, err)
+			}
+
+			templateName := strings.TrimSuffix(filepath.ToSlash(relPath),
+				".gotpl")
 
 			templateData, err := os.ReadFile(filePath)
 			if err != nil {
@@ -59,7 +64,7 @@ func LoadTemplates(
 
 			return nil
 		})
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err != nil {
 		return nil, nil, err
 	}
 

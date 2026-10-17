@@ -3,13 +3,14 @@ package utils
 import (
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 )
 
 func WalkFS(filePath string, fn func(string, string, fs.FileInfo) error) error {
+	var ancestors []fs.FileInfo
+
 	var walk func(string, string, fs.FileInfo) error
 
 	walk = func(virtualPath, filePath string, info fs.FileInfo) error {
@@ -20,7 +21,6 @@ func WalkFS(filePath string, fn func(string, string, fs.FileInfo) error) error {
 					filePath, err)
 			}
 
-			virtualPath = filePath
 			filePath = targetPath
 
 			info, err = os.Stat(filePath)
@@ -29,28 +29,44 @@ func WalkFS(filePath string, fn func(string, string, fs.FileInfo) error) error {
 			}
 		}
 
-		if info.IsDir() {
-			filenames, err := ioutil.ReadDir(filePath)
-			if err != nil {
-				return fmt.Errorf("cannot list directory %q: %w",
-					filePath, err)
-			}
-
-			for _, childInfo := range filenames {
-				childName := childInfo.Name()
-				childVirtualPath := path.Join(virtualPath, childName)
-				childFilePath := path.Join(filePath, childName)
-
-				err := walk(childVirtualPath, childFilePath, childInfo)
-				if err != nil {
-					return err
-				}
-			}
-
-			return nil
-		} else {
+		if !info.IsDir() {
 			return fn(virtualPath, filePath, info)
 		}
+
+		for _, ancestor := range ancestors {
+			if os.SameFile(ancestor, info) {
+				return fmt.Errorf("symlink loop at %q (%q)", virtualPath,
+					filePath)
+			}
+		}
+
+		ancestors = append(ancestors, info)
+		defer func() {
+			ancestors = ancestors[:len(ancestors)-1]
+		}()
+
+		entries, err := os.ReadDir(filePath)
+		if err != nil {
+			return fmt.Errorf("cannot list directory %q: %w", filePath, err)
+		}
+
+		for _, entry := range entries {
+			childInfo, err := entry.Info()
+			if err != nil {
+				return fmt.Errorf("cannot stat %q: %w",
+					path.Join(filePath, entry.Name()), err)
+			}
+
+			childVirtualPath := path.Join(virtualPath, entry.Name())
+			childFilePath := path.Join(filePath, entry.Name())
+
+			err = walk(childVirtualPath, childFilePath, childInfo)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	info, err := os.Stat(filePath)
