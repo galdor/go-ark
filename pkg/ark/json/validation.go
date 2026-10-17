@@ -90,10 +90,15 @@ func (v *Validator) Pop() {
 }
 
 func (v *Validator) WithChild(token any, fn func()) {
-	v.Push(pointerTokenString(token))
-	defer v.Pop()
+	if token != nil {
+		v.Push(pointerTokenString(token))
+	}
 
 	fn()
+
+	if token != nil {
+		v.Pop()
+	}
 }
 
 func (v *Validator) AddError(token any, code, format string, args ...any) {
@@ -269,9 +274,9 @@ func (v *Validator) doCheckObject(token, value any) bool {
 		return true
 	}
 
-	v.Push(token)
-	value2.ValidateJSON(v)
-	v.Pop()
+	v.WithChild(token, func() {
+		value2.ValidateJSON(v)
+	})
 
 	return len(v.Errors) == nbErrors
 }
