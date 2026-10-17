@@ -93,7 +93,7 @@ func (h *TerminalHandler) WithGroup(name string) slog.Handler {
 		if h2.group != "" {
 			h2.group += "."
 		}
-		h2.group = name
+		h2.group += name
 	}
 
 	return &h2
