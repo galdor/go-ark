@@ -35,9 +35,10 @@ type ErrorData any
 type ErrorHandler func(*Handler, int, string, string, ErrorData)
 
 type ServerCfg struct {
-	Address            string `json:"address"`
-	HideInternalErrors bool   `json:"hide_internal_errors"`
-	EnablePprof        bool   `json:"enable_pprof"`
+	Address                  string `json:"address"`
+	HideInternalErrors       bool   `json:"hide_internal_errors"`
+	EnablePprof              bool   `json:"enable_pprof"`
+	TrustAddressHeaderFields bool   `json:"trust_address_header_fields"`
 
 	ErrorHandler ErrorHandler `json:"-"`
 }
@@ -207,7 +208,7 @@ func (s *Server) finalizeHandler(
 	h.Method = method
 	h.PathPattern = pathPattern
 	h.RouteId = s.RouteId(method, pathPattern, options)
-	h.ClientAddress = requestClientAddress(req)
+	h.ClientAddress = s.requestClientAddress(req)
 
 	var attrs []any
 
@@ -303,18 +304,20 @@ func requestHandler(req *http.Request) *Handler {
 	return value.(*Handler)
 }
 
-func requestClientAddress(req *http.Request) string {
-	if v := req.Header.Get("X-Real-IP"); v != "" {
-		return v
-	}
-
-	if v := req.Header.Get("X-Forwarded-For"); v != "" {
-		i := strings.Index(v, ",")
-		if i == -1 {
+func (s *Server) requestClientAddress(req *http.Request) string {
+	if s.Cfg.TrustAddressHeaderFields {
+		if v := req.Header.Get("X-Real-IP"); v != "" {
 			return v
 		}
 
-		return strings.TrimSpace(v[:i])
+		if v := req.Header.Get("X-Forwarded-For"); v != "" {
+			i := strings.Index(v, ",")
+			if i == -1 {
+				return v
+			}
+
+			return strings.TrimSpace(v[:i])
+		}
 	}
 
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
