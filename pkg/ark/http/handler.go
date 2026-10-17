@@ -20,8 +20,9 @@ import (
 	"go.n16f.net/ark/pkg/ark/utils"
 )
 
+// Assumes that the hash is SHA1 (40 characters).
 var filePathCacheBustingRE = regexp.MustCompile(
-	`^(.+)\.(?:[a-z0-9]+)\.([A-Za-z0-9]{1,5})$`)
+	`^(.+)\.(?:[a-z0-9]{40})\.([A-Za-z0-9]{1,5})$`)
 
 var (
 	contextKeyHandler contextKey = struct{}{}
