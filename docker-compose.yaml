@@ -20,6 +20,25 @@ services:
       driver: "json-file"
       options:
         max-size: "10m"
+  postgresql:
+    image: "postgres:18"
+    command: >
+      postgres -c "shared_buffers=1GB"
+               -c "max_connections=200"
+               -c "log_statement=all"
+    container_name: "ark-postgresql"
+    ports: ["127.0.0.1:5432:5432"]
+    volumes:
+      - "./docker-compose/postgresql:/docker-entrypoint-initdb.d:ro"
+      - "postgresql-data:/var/lib/postgresql:rw"
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB: "service"
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "postgres"]
+      interval: "5s"
   victoria-metrics:
     image: "victoriametrics/victoria-metrics:v1.153.0"
     container_name: "ark-victoria-metrics"
@@ -54,5 +73,6 @@ services:
     logging: *logging
 volumes:
   grafana-data:
+  postgresql-data:
   victoria-metrics-data:
   vmagent-data:

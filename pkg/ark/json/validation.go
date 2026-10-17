@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -209,6 +210,24 @@ func (v *Validator) CheckStringLengthMinMax(
 func (v *Validator) CheckStringNotEmpty(token any, s string) bool {
 	return v.Check(token, s != "", "missing_or_empty_string",
 		"missing or empty string")
+}
+
+func (v *Validator) CheckURI(token any, s string) bool {
+	// The url.Parse function parses URI references. Most of the time we are
+	// interested in URIs so we check that there is a scheme.
+
+	uri, err := url.Parse(s)
+	if err != nil {
+		v.AddError(token, "invalid_uri_format", "string must be a valid URI")
+		return false
+	}
+
+	if uri.Scheme == "" {
+		v.AddError(token, "missing_uri_scheme", "URI must have a scheme")
+		return false
+	}
+
+	return true
 }
 
 func (v *Validator) CheckNetworkAddress(token any, s string) bool {
