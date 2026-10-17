@@ -32,6 +32,7 @@ func (h *WebsocketHandler) Start(p *ark.Process) error {
 }
 
 func (h *WebsocketHandler) Stop() {
+	h.Behavior.Stop()
 }
 
 func (h *WebsocketHandler) Main() error {
