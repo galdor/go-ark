@@ -49,6 +49,11 @@ func (h *WebsocketHandler) Main() error {
 				return nil
 			}
 
+			var closeErr websocket.CloseError
+			if errors.As(err, &closeErr) {
+				return nil
+			}
+
 			return fmt.Errorf("cannot read connection: %w", err)
 		}
 
