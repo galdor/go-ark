@@ -309,12 +309,12 @@ func requestClientAddress(req *http.Request) string {
 	}
 
 	if v := req.Header.Get("X-Forwarded-For"); v != "" {
-		i := strings.Index(v, ", ")
+		i := strings.Index(v, ",")
 		if i == -1 {
 			return v
 		}
 
-		return v[:i]
+		return strings.TrimSpace(v[:i])
 	}
 
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
