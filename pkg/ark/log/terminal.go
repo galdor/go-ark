@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -67,6 +68,7 @@ func (h *TerminalHandler) Enabled(ctx context.Context, level slog.Level) bool {
 
 func (h *TerminalHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	h2 := *h
+	h2.attributes = slices.Clone(h.attributes)
 
 	for _, attr := range attrs {
 		if attr.Key == "scope" {
