@@ -1,6 +1,7 @@
 package log
 
 import (
+	"fmt"
 	"log/slog"
 	"slices"
 	"strconv"
@@ -59,6 +60,7 @@ func (as *Attributes) SortAndDeduplicate() {
 func FormatAttributeValue(value slog.Value) (s string) {
 	switch value.Kind() {
 	case slog.KindAny:
+		s = FormatStringValue(fmt.Sprint(value.Any()))
 
 	case slog.KindBool:
 		s = strconv.FormatBool(value.Bool())
