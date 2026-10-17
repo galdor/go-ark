@@ -69,6 +69,14 @@ func (h *Handler) Stop() {
 	}
 }
 
+func (h *Handler) Context() context.Context {
+	return h.Request.Context()
+}
+
+func (h *Handler) Done() <-chan struct{} {
+	return h.Context().Done()
+}
+
 func (h *Handler) onRequestHandled() {
 	h.responseTime = new(time.Since(h.startTime))
 

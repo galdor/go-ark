@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	_ "net/http/pprof"
+	"time"
 
 	"github.com/coder/websocket"
 	"go.n16f.net/ark/pkg/ark"
@@ -31,6 +33,7 @@ func (e *Example) Start(p *ark.Process) error {
 	httpServer.Route("/ping", "GET", e.hPing)
 	httpServer.Route("/panic", "GET", e.hPanic)
 	httpServer.Route("/websocket", "GET", e.hWebsocket)
+	httpServer.Route("/sleep", "GET", e.hSleep)
 
 	e.process.AddChild("http_server", httpServer)
 
@@ -51,6 +54,15 @@ func (e *Example) hPing(h *http.Handler) {
 
 func (e *Example) hPanic(h *http.Handler) {
 	panic("example error")
+}
+
+func (e *Example) hSleep(h *http.Handler) {
+	select {
+	case <-time.After(60 * time.Second):
+	case <-h.Done():
+	}
+
+	h.ReplyEmpty(204)
 }
 
 func (e *Example) hWebsocket(h *http.Handler) {

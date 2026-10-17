@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"unicode/utf8"
 
 	"go.n16f.net/ark/pkg/ark/utils"
 )
@@ -118,6 +119,86 @@ func (v *Validator) Check(
 	}
 
 	return value
+}
+
+func (v *Validator) CheckIntMin(token any, i int, min int) bool {
+	return v.Check(token, i >= min, "integer_too_small",
+		"integer must be greater or equal to %d", min)
+}
+
+func (v *Validator) CheckIntMax(token any, i int, max int) bool {
+	return v.Check(token, i <= max, "integer_too_large",
+		"integer must be lower or equal to %d", max)
+}
+
+func (v *Validator) CheckIntMinMax(token any, i int, min, max int) bool {
+	if !v.CheckIntMin(token, i, min) {
+		return false
+	}
+
+	return v.CheckIntMax(token, i, max)
+}
+
+func (v *Validator) CheckInt64Min(token any, i, min int64) bool {
+	return v.Check(token, i >= min, "integer_too_small",
+		"integer must be greater or equal to %d", min)
+}
+
+func (v *Validator) CheckInt64Max(token any, i, max int64) bool {
+	return v.Check(token, i <= max, "integer_too_large",
+		"integer must be lower or equal to %d", max)
+}
+
+func (v *Validator) CheckInt64MinMax(token any, i, min, max int64) bool {
+	if !v.CheckInt64Min(token, i, min) {
+		return false
+	}
+
+	return v.CheckInt64Max(token, i, max)
+}
+
+func (v *Validator) CheckFloatMin(token any, f, min float64) bool {
+	return v.Check(token, f >= min, "float_too_small",
+		"float %s must be greater or equal to %s",
+		strconv.FormatFloat(f, 'f', -1, 64),
+		strconv.FormatFloat(min, 'f', -1, 64))
+}
+
+func (v *Validator) CheckFloatMax(token any, f, max float64) bool {
+	return v.Check(token, f <= max, "float_too_large",
+		"float %s must be lower or equal to %s",
+		strconv.FormatFloat(f, 'f', -1, 64),
+		strconv.FormatFloat(max, 'f', -1, 64))
+}
+
+func (v *Validator) CheckFloatMinMax(token any, f, min, max float64) bool {
+	if !v.CheckFloatMin(token, f, min) {
+		return false
+	}
+
+	return v.CheckFloatMax(token, f, max)
+}
+
+func (v *Validator) CheckStringLengthMin(token any, s string, min int) bool {
+	length := utf8.RuneCountInString(s)
+	return v.Check(token, length >= min, "string_too_short",
+		"string length must be greater or equal to %d", min)
+}
+
+func (v *Validator) CheckStringLengthMax(token any, s string, max int) bool {
+	length := utf8.RuneCountInString(s)
+	return v.Check(token, length <= max, "string_too_long",
+		"string length must be lower or equal to %d", max)
+}
+
+func (v *Validator) CheckStringLengthMinMax(
+	token any, s string, min, max int,
+) bool {
+	if !v.CheckStringLengthMin(token, s, min) {
+		return false
+	}
+
+	return v.CheckStringLengthMax(token, s, max)
 }
 
 func (v *Validator) CheckStringNotEmpty(token any, s string) bool {

@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -18,6 +19,8 @@ import (
 )
 
 const (
+	DefaultServerShutdownTimeout = 5 * time.Second
+
 	ErrorCodeHeaderField = "X-Ark-Error-Code"
 )
 
@@ -39,12 +42,17 @@ type ServerCfg struct {
 	HideInternalErrors       bool   `json:"hide_internal_errors"`
 	EnablePprof              bool   `json:"enable_pprof"`
 	TrustAddressHeaderFields bool   `json:"trust_address_header_fields"`
+	ShutdownTimeout          int    `json:"shutdown_timeout"`
 
 	ErrorHandler ErrorHandler `json:"-"`
 }
 
 func (cfg *ServerCfg) ValidateJSON(v *json.Validator) {
 	v.CheckNetworkAddress("address", cfg.Address)
+
+	if cfg.ShutdownTimeout != 0 {
+		v.CheckIntMin("shutdown_timeout", cfg.ShutdownTimeout, 0)
+	}
 }
 
 type Server struct {
@@ -123,16 +131,29 @@ func (s *Server) Main() error {
 	case <-s.process.Stopping():
 	}
 
-	timeout := 5 * time.Second
+	timeout := DefaultServerShutdownTimeout
+	if s.Cfg.ShutdownTimeout >= 0 {
+		timeout = time.Duration(s.Cfg.ShutdownTimeout) * time.Second
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	if err := s.server.Shutdown(ctx); err != nil {
-		return err
+	shutdownErr := s.server.Shutdown(ctx)
+	if shutdownErr != nil {
+		s.server.Close()
 	}
 
 	if err := <-errChan; err != http.ErrServerClosed {
 		return fmt.Errorf("HTTP server initialization failed: %w", err)
+	}
+
+	if shutdownErr != nil {
+		if errors.Is(shutdownErr, context.DeadlineExceeded) {
+			return nil
+		}
+
+		return fmt.Errorf("HTTP server shutdown error: %w", shutdownErr)
 	}
 
 	return nil
