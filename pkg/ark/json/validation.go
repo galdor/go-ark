@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 
 	"go.n16f.net/ark/pkg/ark/utils"
@@ -194,6 +195,37 @@ func (v *Validator) CheckURI(token any, s string) bool {
 	}
 
 	return true
+}
+
+func (v *Validator) CheckEmailAddress(token any, s string) bool {
+	// Email validation is one of the most nitpicked subject in the software
+	// industry. We keep validation to a minimum: one can always write a more
+	// stringent method if needs be.
+
+	if !v.CheckStringNotEmpty(token, s) {
+		return false
+	}
+
+	nbErrors := 0
+	addError := func(format string, args ...any) {
+		v.AddError(token, "invalid_email_address", format, args...)
+		nbErrors++
+	}
+
+	localPart, domain, found := strings.Cut(s, "@")
+	if found {
+		if len(domain) == 0 {
+			addError("invalid empty domain")
+		}
+
+		if len(localPart) == 0 {
+			addError("invalid empty local part")
+		}
+	} else {
+		addError("missing '@' separator")
+	}
+
+	return nbErrors == 0
 }
 
 func (v *Validator) CheckNetworkAddress(token any, s string) bool {
