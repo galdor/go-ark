@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
@@ -117,6 +118,43 @@ func (h *Handler) logRequest() {
 	h.Log.InfoData(attrs, "%s %s %s %s",
 		req.Method, utils.EscapeNonPrintable(req.URL.Path), statusString,
 		utils.FormatSeconds(h.responseTime.Seconds(), 1))
+}
+
+func (h *Handler) RequestData() ([]byte, error) {
+	data, err := ioutil.ReadAll(h.Request.Body)
+	if err != nil {
+		err = fmt.Errorf("cannot read request body: %w", err)
+		h.ReplyInternalError(500, "%v", err)
+		return nil, err
+	}
+
+	return data, nil
+}
+
+func (h *Handler) JSONRequestData(dest any) error {
+	data, err := h.RequestData()
+	if err != nil {
+		return err
+	}
+
+	opts := json.DecodingOptions{Strict: true}
+
+	if err := json.DecodeWithOptions(data, dest, opts); err != nil {
+		var jsonErrs json.Errors
+
+		if errors.As(err, &jsonErrs) {
+			data := JSONErrorData{JSONErrors: jsonErrs}
+			h.ReplyErrorData(400, "invalid_request_body", data,
+				"invalid request body:\n%v", err)
+		} else {
+			h.ReplyError(400, "invalid_request_body",
+				"invalid request body: %v", err)
+		}
+
+		return fmt.Errorf("invalid request body: %w", err)
+	}
+
+	return nil
 }
 
 func (h *Handler) Reply(status int, r io.Reader) {

@@ -21,7 +21,7 @@ func DecodeWithOptions(data []byte, dest any, opts DecodingOptions) error {
 	}
 
 	if err := json.Unmarshal(data, dest, opts2...); err != nil {
-		return err
+		return TranslateError(err)
 	}
 
 	return Validate(dest)

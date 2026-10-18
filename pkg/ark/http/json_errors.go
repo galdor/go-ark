@@ -17,8 +17,8 @@ type JSONError struct {
 	Data    ErrorData      `json:"-"`
 }
 
-type ValidationJSONErrorData struct {
-	ValidationErrors json.ValidationErrors `json:"validation_errors"`
+type JSONErrorData struct {
+	JSONErrors json.Errors `json:"json_errors"`
 }
 
 func (err *JSONError) MarshalJSON() ([]byte, error) {
@@ -63,10 +63,10 @@ func (err *JSONError) Error() string {
 	return err.Message
 }
 
-func (err *JSONError) DecodeData(target any) error {
+func (err *JSONError) DecodeData(dest any) error {
 	if err.RawData == nil {
 		return fmt.Errorf("missing or empty error data")
 	}
 
-	return json.Decode(err.RawData, target)
+	return json.Decode(err.RawData, dest)
 }

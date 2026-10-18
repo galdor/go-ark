@@ -1,7 +1,6 @@
 package json
 
 import (
-	"bytes"
 	"encoding/json/jsontext"
 	"errors"
 	"fmt"
@@ -16,42 +15,9 @@ import (
 	"go.n16f.net/ark/pkg/ark/utils"
 )
 
-type ValidationError struct {
-	Pointer jsontext.Pointer `json:"pointer"`
-	Code    string           `json:"code"`
-	Message string           `json:"message"`
-}
-
-func (err ValidationError) Error() string {
-	if len(err.Pointer) == 0 {
-		return err.Message
-	} else {
-		return fmt.Sprintf("%v  %s", err.Pointer, err.Message)
-	}
-}
-
-type ValidationErrors []*ValidationError
-
-func (errs ValidationErrors) Error() string {
-	var buf bytes.Buffer
-
-	buf.WriteString("invalid data")
-
-	if len(errs) > 0 {
-		buf.WriteByte(':')
-	}
-
-	for _, err := range errs {
-		buf.WriteString("\n  ")
-		buf.WriteString(err.Error())
-	}
-
-	return buf.String()
-}
-
 type Validator struct {
 	Pointer jsontext.Pointer
-	Errors  ValidationErrors
+	Errors  Errors
 }
 
 type Validatable interface {
@@ -108,7 +74,7 @@ func (v *Validator) AddError(token any, code, format string, args ...any) {
 		pointer = pointer.AppendToken(pointerTokenString(token))
 	}
 
-	err := ValidationError{
+	err := Error{
 		Pointer: pointer,
 		Code:    code,
 		Message: fmt.Sprintf(format, args...),
