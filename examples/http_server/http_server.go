@@ -30,10 +30,10 @@ func (e *Example) Start(p *ark.Process) error {
 		return fmt.Errorf("cannot create HTTP server: %v", err)
 	}
 
-	httpServer.Route("/ping", "GET", e.hPing)
-	httpServer.Route("/panic", "GET", e.hPanic)
-	httpServer.Route("/websocket", "GET", e.hWebsocket)
-	httpServer.Route("/sleep", "GET", e.hSleep)
+	httpServer.Route("/ping", "GET", e.hPing, nil)
+	httpServer.Route("/panic", "GET", e.hPanic, nil)
+	httpServer.Route("/websocket", "GET", e.hWebsocket, nil)
+	httpServer.Route("/sleep", "GET", e.hSleep, nil)
 
 	e.process.AddChild("http_server", httpServer)
 

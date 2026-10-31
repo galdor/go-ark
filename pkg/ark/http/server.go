@@ -171,11 +171,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.process.AddChildWithOptions("handler", &h, processOpts)
 }
 
-func (s *Server) Route(pathPattern, method string, routeFunc RouteFunc) {
-	s.RouteWithOptions(pathPattern, method, routeFunc, nil)
-}
-
-func (s *Server) RouteWithOptions(
+func (s *Server) Route(
 	pathPattern, method string, routeFunc RouteFunc, opts *RouteOptions,
 ) {
 	method = strings.ToUpper(method)
@@ -404,9 +400,9 @@ func (s *Server) initPprofRoutes() {
 	// It would be convenient to serve pprof routes at /pprof but pprof assumes
 	// that the URI starts with /debug/pprof/ (not the final "/").
 
-	s.Route("/debug/pprof/", "GET", wrap(pprof.Index))
+	s.Route("/debug/pprof/", "GET", wrap(pprof.Index), nil)
 
 	for subpath, handler := range routes {
-		s.Route("/debug/pprof"+subpath, "GET", wrap(handler))
+		s.Route("/debug/pprof"+subpath, "GET", wrap(handler), nil)
 	}
 }
