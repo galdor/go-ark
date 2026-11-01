@@ -261,13 +261,18 @@ func (h *Handler) ReplyErrorData(
 	h.errorCode = code
 
 	msg := fmt.Sprintf(format, args...)
+
+	attrs := []any{
+		"error", code,
+		"status", status,
+	}
+	h.Log.ErrorData(attrs, "error: %s", msg)
+
 	h.Server.Cfg.ErrorHandler(h, status, code, msg, data)
 }
 
 func (h *Handler) ReplyInternalError(status int, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-
-	h.Log.Error("internal error: %s", msg)
 
 	if h.Server.Cfg.HideInternalErrors {
 		msg = "internal error"
