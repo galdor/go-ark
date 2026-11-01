@@ -11,6 +11,7 @@ import (
 	"net/http/pprof"
 	"strings"
 	"time"
+	"uuid"
 
 	"go.n16f.net/ark/pkg/ark"
 	"go.n16f.net/ark/pkg/ark/json"
@@ -38,11 +39,12 @@ type ErrorData any
 type ErrorHandler func(*Handler, int, string, string, ErrorData)
 
 type ServerCfg struct {
-	Address                  string `json:"address"`
-	HideInternalErrors       bool   `json:"hide_internal_errors"`
-	EnablePprof              bool   `json:"enable_pprof"`
-	TrustAddressHeaderFields bool   `json:"trust_address_header_fields"`
-	ShutdownTimeout          int    `json:"shutdown_timeout"`
+	Address                   string `json:"address"`
+	HideInternalErrors        bool   `json:"hide_internal_errors"`
+	EnablePprof               bool   `json:"enable_pprof"`
+	TrustAddressHeaderFields  bool   `json:"trust_address_header_fields"`
+	TrustRequestIdHeaderField bool   `json:"trust_request_id_header_field"`
+	ShutdownTimeout           int    `json:"shutdown_timeout"`
 
 	ErrorHandler ErrorHandler `json:"-"`
 }
@@ -233,8 +235,11 @@ func (s *Server) finalizeHandler(
 	h.Query = req.URL.Query()
 	h.RouteId = s.RouteId(method, pathPattern, h.Options)
 	h.ClientAddress = s.requestClientAddress(req)
+	h.RequestId = s.requestId(req)
 
-	var attrs []any
+	attrs := []any{
+		"http.request_id", h.RequestId,
+	}
 
 	if h.RouteId != "" {
 		attrs = append(attrs, "http.route")
@@ -247,6 +252,16 @@ func (s *Server) finalizeHandler(
 	}
 
 	h.Log = h.Log.With(attrs...)
+}
+
+func (s *Server) requestId(req *http.Request) string {
+	if s.Cfg.TrustRequestIdHeaderField {
+		if id := req.Header.Get("X-Request-ID"); id != "" {
+			return id
+		}
+	}
+
+	return uuid.NewV7().String()
 }
 
 func (s *Server) RouteId(method, pathPattern string, options *RouteOptions) string {

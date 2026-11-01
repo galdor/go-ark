@@ -42,6 +42,7 @@ type Handler struct {
 	Query         url.Values
 	RouteId       string
 	ClientAddress string // optional
+	RequestId     string
 
 	process      *ark.Process
 	startTime    time.Time
@@ -173,6 +174,9 @@ func (h *Handler) AddCookie(cookie *http.Cookie) {
 }
 
 func (h *Handler) Reply(status int, r io.Reader) {
+	header := h.ResponseWriter.Header()
+	header.Set("X-Request-ID", h.RequestId)
+
 	h.ResponseWriter.WriteHeader(status)
 
 	if r != nil {
@@ -321,6 +325,12 @@ func (h *Handler) ReplyFile(filePath string) {
 		return
 	}
 	defer body.Close()
+
+	// We have to set the request id here: it is the only reply function that
+	// does not use the Reply method.
+
+	header := h.ResponseWriter.Header()
+	header.Set("X-Request-ID", h.RequestId)
 
 	http.ServeContent(h.ResponseWriter, h.Request, filePath, modTime, body)
 }
