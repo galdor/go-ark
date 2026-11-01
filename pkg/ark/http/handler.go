@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -38,6 +39,7 @@ type Handler struct {
 
 	Method        string
 	PathPattern   string
+	Query         url.Values
 	RouteId       string
 	ClientAddress string // optional
 
@@ -118,6 +120,14 @@ func (h *Handler) logRequest() {
 	h.Log.InfoData(attrs, "%s %s %s %s",
 		req.Method, utils.EscapeNonPrintable(req.URL.Path), statusString,
 		utils.FormatSeconds(h.responseTime.Seconds(), 1))
+}
+
+func (h *Handler) HasQueryParameter(name string) bool {
+	return h.Query.Has(name)
+}
+
+func (h *Handler) QueryParameter(name string) string {
+	return h.Query.Get(name)
 }
 
 func (h *Handler) RequestData() ([]byte, error) {

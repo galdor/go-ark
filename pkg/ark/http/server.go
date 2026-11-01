@@ -230,6 +230,7 @@ func (s *Server) finalizeHandler(
 
 	h.Method = method
 	h.PathPattern = pathPattern
+	h.Query = req.URL.Query()
 	h.RouteId = s.RouteId(method, pathPattern, h.Options)
 	h.ClientAddress = s.requestClientAddress(req)
 
