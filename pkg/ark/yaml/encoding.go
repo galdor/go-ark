@@ -3,7 +3,9 @@ package yaml
 import (
 	"bytes"
 	"io"
+	"strconv"
 
+	"github.com/goccy/go-yaml"
 	goyaml "github.com/goccy/go-yaml"
 )
 
@@ -32,7 +34,7 @@ func EncodeToWithOptions(value any, w io.Writer, opts EncodingOptions) error {
 	opts2 := []goyaml.EncodeOption{
 		goyaml.Indent(2),
 		goyaml.IndentSequence(false),
-		goyaml.UseSingleQuote(false),
+		yaml.CustomMarshaler[string](encodeString),
 	}
 
 	data, err := goyaml.MarshalWithOptions(value, opts2...)
@@ -42,4 +44,8 @@ func EncodeToWithOptions(value any, w io.Writer, opts EncodingOptions) error {
 
 	_, err = io.Copy(w, bytes.NewReader(data))
 	return err
+}
+
+func encodeString(s string) ([]byte, error) {
+	return []byte(strconv.Quote(s)), nil
 }
