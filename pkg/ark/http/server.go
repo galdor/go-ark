@@ -40,7 +40,7 @@ type ErrorHandler func(*Handler, int, string, string, ErrorData)
 
 type ServerCfg struct {
 	Address                   string `json:"address"`
-	HideInternalErrors        bool   `json:"hide_internal_errors"`
+	ShowInternalErrors        bool   `json:"show_internal_errors"`
 	EnablePprof               bool   `json:"enable_pprof"`
 	TrustAddressHeaderFields  bool   `json:"trust_address_header_fields"`
 	TrustRequestIdHeaderField bool   `json:"trust_request_id_header_field"`

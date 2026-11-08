@@ -278,7 +278,7 @@ func (h *Handler) ReplyErrorData(
 func (h *Handler) ReplyInternalError(status int, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 
-	if h.Server.Cfg.HideInternalErrors {
+	if !h.Server.Cfg.ShowInternalErrors {
 		msg = "internal error"
 	}
 
