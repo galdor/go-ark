@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"go.n16f.net/ark/pkg/ark"
+	"go.n16f.net/ark/pkg/ark/base64"
 	"go.n16f.net/ark/pkg/ark/json"
 	"go.n16f.net/ark/pkg/ark/log"
 	"go.n16f.net/ark/pkg/ark/utils"
@@ -129,6 +130,31 @@ func (h *Handler) HasQueryParameter(name string) bool {
 
 func (h *Handler) QueryParameter(name string) string {
 	return h.Query.Get(name)
+}
+
+func (h *Handler) Base64QueryParameter(name string) ([]byte, error) {
+	encodedValue := h.QueryParameter(name)
+	if len(encodedValue) == 0 {
+		return nil, nil
+	}
+
+	value, err := base64.URLDecode(encodedValue)
+	if err != nil {
+		err = fmt.Errorf("cannot decode query parameter %q: %w", name, err)
+		h.ReplyError(400, "invalid_query_parameter", "%v", err)
+		return nil, err
+	}
+
+	return value, nil
+}
+
+func (h *Handler) Base64QueryParameterString(name string) (string, error) {
+	value, err := h.Base64QueryParameter(name)
+	if err != nil {
+		return "", err
+	}
+
+	return string(value), nil
 }
 
 func (h *Handler) RequestData() ([]byte, error) {
