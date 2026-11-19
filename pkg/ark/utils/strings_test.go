@@ -3,11 +3,11 @@ package utils
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"go.n16f.net/check"
 )
 
 func TestEscapeNonPrintable(t *testing.T) {
-	assert := assert.New(t)
+	check := check.New(t)
 
 	tests := []struct {
 		s  string
@@ -22,6 +22,6 @@ func TestEscapeNonPrintable(t *testing.T) {
 
 	for _, test := range tests {
 		es := EscapeNonPrintable(test.s)
-		assert.Equal(test.es, es, test.s)
+		check.Equal(es, test.es, test.s)
 	}
 }

@@ -14,7 +14,9 @@ func Decode(data []byte, dest any) error {
 }
 
 func DecodeWithOptions(data []byte, dest any, opts DecodingOptions) error {
-	var opts2 []goyaml.DecodeOption
+	opts2 := []goyaml.DecodeOption{
+		goyaml.UseJSONUnmarshaler(),
+	}
 
 	if opts.Strict {
 		opts2 = append(opts2, goyaml.DisallowUnknownField())

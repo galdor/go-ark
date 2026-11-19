@@ -3,26 +3,26 @@ package pg
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"go.n16f.net/check"
 )
 
 func TestQuoteString(t *testing.T) {
-	assert := assert.New(t)
+	check := check.New(t)
 
-	assert.Equal(`''`, QuoteString(``))
-	assert.Equal(`'foo'`, QuoteString(`foo`))
-	assert.Equal(`'foo bar'`, QuoteString(`foo bar`))
-	assert.Equal(`'foo ''bar'''`, QuoteString(`foo 'bar'`))
-	assert.Equal(`''''''`, QuoteString(`''`))
+	check.Equal(QuoteString(``), `''`)
+	check.Equal(QuoteString(`foo`), `'foo'`)
+	check.Equal(QuoteString(`foo bar`), `'foo bar'`)
+	check.Equal(QuoteString(`foo 'bar'`), `'foo ''bar'''`)
+	check.Equal(QuoteString(`''`), `''''''`)
 }
 
 func TestQuoteIdentifier(t *testing.T) {
-	assert := assert.New(t)
+	check := check.New(t)
 
-	assert.Equal(`foo`, QuoteIdentifier(`foo`))
-	assert.Equal(`"123foo"`, QuoteIdentifier(`123foo`))
-	assert.Equal(`"foo ""bar"" baz"`, QuoteIdentifier(`foo "bar" baz`))
-	assert.Equal(`"foo bar baz"`, QuoteIdentifier(`foo bar baz`))
-	assert.Equal(`"""hello"""`, QuoteIdentifier(`"hello"`))
-	assert.Equal(`""""""`, QuoteIdentifier(`""`))
+	check.Equal(QuoteIdentifier(`foo`), `foo`)
+	check.Equal(QuoteIdentifier(`123foo`), `"123foo"`)
+	check.Equal(QuoteIdentifier(`foo "bar" baz`), `"foo ""bar"" baz"`)
+	check.Equal(QuoteIdentifier(`foo bar baz`), `"foo bar baz"`)
+	check.Equal(QuoteIdentifier(`"hello"`), `"""hello"""`)
+	check.Equal(QuoteIdentifier(`""`), `""""""`)
 }

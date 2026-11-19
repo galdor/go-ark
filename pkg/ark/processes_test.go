@@ -6,8 +6,7 @@ import (
 
 	"go.n16f.net/ark/pkg/ark/log"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"go.n16f.net/check"
 )
 
 var (
@@ -54,47 +53,45 @@ func RunTestProcess(p *TestProcess) error {
 }
 
 func TestQuickRun(t *testing.T) {
-	require := require.New(t)
-	assert := assert.New(t)
+	check := check.New(t)
 
 	tp := TestProcess{}
-	require.NoError(RunTestProcess(&tp))
 
-	assert.Equal(1, tp.NbStartCalls)
-	assert.Equal(1, tp.NbMainCalls)
-	assert.Equal(1, tp.NbStopCalls)
+	if check.NotError(RunTestProcess(&tp)) {
+		check.Equal(tp.NbStartCalls, 1)
+		check.Equal(tp.NbMainCalls, 1)
+		check.Equal(tp.NbStopCalls, 1)
+	}
 }
 
 func TestStartError(t *testing.T) {
-	require := require.New(t)
-	assert := assert.New(t)
+	check := check.New(t)
 
 	tp := TestProcess{StartFailure: true}
 	err := RunTestProcess(&tp)
 
 	var startErr *ProcessStartError
-	require.Error(err)
-	require.ErrorAs(err, &startErr)
-	require.ErrorIs(err, ErrStartFailure)
+	if check.ErrorAs(err, &startErr) {
+		check.ErrorIs(err, ErrStartFailure)
+	}
 
-	assert.Equal(1, tp.NbStartCalls)
-	assert.Equal(0, tp.NbMainCalls)
-	assert.Equal(1, tp.NbStopCalls)
+	check.Equal(tp.NbStartCalls, 1)
+	check.Equal(tp.NbMainCalls, 0)
+	check.Equal(tp.NbStopCalls, 1)
 }
 
 func TestMainError(t *testing.T) {
-	require := require.New(t)
-	assert := assert.New(t)
+	check := check.New(t)
 
 	tp := TestProcess{MainFailure: true}
 	err := RunTestProcess(&tp)
 
 	var mainErr *ProcessMainError
-	require.Error(err)
-	require.ErrorAs(err, &mainErr)
-	require.ErrorIs(err, ErrMainFailure)
+	if check.ErrorAs(err, &mainErr) {
+		check.ErrorIs(err, ErrMainFailure)
+	}
 
-	assert.Equal(1, tp.NbStartCalls)
-	assert.Equal(1, tp.NbMainCalls)
-	assert.Equal(1, tp.NbStopCalls)
+	check.Equal(tp.NbStartCalls, 1)
+	check.Equal(tp.NbMainCalls, 1)
+	check.Equal(tp.NbStopCalls, 1)
 }

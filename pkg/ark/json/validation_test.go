@@ -4,7 +4,7 @@ import (
 	"encoding/json/jsontext"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"go.n16f.net/check"
 )
 
 type testObject struct {
@@ -16,44 +16,44 @@ func (obj *testObject) ValidateJSON(v *Validator) {
 }
 
 func TestCheckStringNotEmpty(t *testing.T) {
-	assert := assert.New(t)
+	check := check.New(t)
 
 	var v *Validator
 
 	v = NewValidator()
-	if assert.False(v.CheckStringNotEmpty(nil, "")) {
-		assertValidationError(t, v, 0, "", "missing_or_empty_string")
+	if check.False(v.CheckStringNotEmpty(nil, "")) {
+		checkValidationError(t, v, 0, "", "missing_or_empty_string")
 	}
 
 	v = NewValidator()
-	assert.True(v.CheckStringNotEmpty(nil, "foo"))
+	check.True(v.CheckStringNotEmpty(nil, "foo"))
 }
 
 func TestCheckNetworkAddress(t *testing.T) {
-	assert := assert.New(t)
+	check := check.New(t)
 
 	var v *Validator
 
 	v = NewValidator()
-	if assert.False(v.CheckNetworkAddress(nil, "")) {
-		assertValidationError(t, v, 0, "", "invalid_address")
+	if check.False(v.CheckNetworkAddress(nil, "")) {
+		checkValidationError(t, v, 0, "", "invalid_address")
 	}
 
 	v = NewValidator()
-	if assert.False(v.CheckNetworkAddress(nil, "localhost")) {
-		assertValidationError(t, v, 0, "", "invalid_address")
+	if check.False(v.CheckNetworkAddress(nil, "localhost")) {
+		checkValidationError(t, v, 0, "", "invalid_address")
 	}
 
 	v = NewValidator()
-	if assert.False(v.CheckNetworkAddress(nil, "localhost:foo")) {
-		assertValidationError(t, v, 0, "", "invalid_port_number")
+	if check.False(v.CheckNetworkAddress(nil, "localhost:foo")) {
+		checkValidationError(t, v, 0, "", "invalid_port_number")
 	}
 
 	v = NewValidator()
-	assert.True(v.CheckNetworkAddress(nil, "[::1]:80"))
+	check.True(v.CheckNetworkAddress(nil, "[::1]:80"))
 
 	v = NewValidator()
-	assert.True(v.CheckNetworkAddress(nil, "localhost:8080"))
+	check.True(v.CheckNetworkAddress(nil, "localhost:8080"))
 }
 
 func TestValidationPaths(t *testing.T) {
@@ -62,19 +62,21 @@ func TestValidationPaths(t *testing.T) {
 	v := NewValidator()
 	v.CheckObject(nil, &obj)
 
-	assertValidationError(t, v, 0, "/string", "missing_or_empty_string")
+	checkValidationError(t, v, 0, "/string", "missing_or_empty_string")
 }
 
-func assertValidationError(
+func checkValidationError(
 	t *testing.T, v *Validator, i int, pointer jsontext.Pointer, code string,
 ) bool {
 	t.Helper()
 
-	if assert.Less(t, i, len(v.Errors)) {
+	check := check.New(t)
+
+	if check.Lesser(i, len(v.Errors)) {
 		validationErr := v.Errors[i]
 
-		return assert.Equal(t, pointer, validationErr.Pointer) &&
-			assert.Equal(t, code, validationErr.Code)
+		return check.Equal(validationErr.Pointer, pointer) &&
+			check.Equal(validationErr.Code, code)
 	}
 
 	return true

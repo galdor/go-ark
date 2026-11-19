@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"go.n16f.net/check"
 )
 
 func TestClientWithTx(t *testing.T) {
-	require := require.New(t)
+	check := check.New(t)
+	check.AbortOnError = true
 
 	ctx := context.Background()
 
@@ -18,7 +19,7 @@ func TestClientWithTx(t *testing.T) {
 	}
 
 	client, err := NewClient(ctx, &clientCfg)
-	require.NoError(err)
+	check.NotError(err)
 
 	err = client.WithConn(ctx, func(conn Conn) error {
 		query := `DROP TABLE IF EXISTS foo`
@@ -33,7 +34,7 @@ func TestClientWithTx(t *testing.T) {
 
 		return nil
 	})
-	require.NoError(err)
+	check.NotError(err)
 
 	// Transactions are not committed if the function panics
 	func() {
@@ -49,7 +50,7 @@ func TestClientWithTx(t *testing.T) {
 
 			panic("test")
 		})
-		require.NoError(err)
+		check.NotError(err)
 	}()
 
 	var count int
@@ -62,6 +63,6 @@ func TestClientWithTx(t *testing.T) {
 
 		return nil
 	})
-	require.NoError(err)
-	require.Equal(0, count)
+	check.NotError(err)
+	check.Equal(count, 0)
 }
