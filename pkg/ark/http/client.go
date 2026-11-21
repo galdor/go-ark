@@ -160,9 +160,14 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 }
 
 func (c *Client) SendRequest(
-	ctx context.Context, method, uri string, header http.Header,
+	ctx context.Context, method, uriRef string, header http.Header,
 	reqBody, resBody any,
 ) (*http.Response, error) {
+	uri, err := c.resolveURI(uriRef)
+	if err != nil {
+		return nil, err
+	}
+
 	var bodyReader io.Reader
 
 	if reqBody != nil {
@@ -221,6 +226,19 @@ func (c *Client) SendRequest(
 	}
 
 	return res, nil
+}
+
+func (c *Client) resolveURI(uri string) (string, error) {
+	if c.baseURI == nil {
+		return uri, nil
+	}
+
+	ref, err := url.Parse(uri)
+	if err != nil {
+		return "", fmt.Errorf("cannot parse URI: %w", err)
+	}
+
+	return c.baseURI.ResolveReference(ref).String(), nil
 }
 
 func (c *Client) dialTLSContext(
