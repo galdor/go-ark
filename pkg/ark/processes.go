@@ -106,6 +106,31 @@ func MustRunProcess(name string, behavior ProcessBehavior, logger *log.Logger) {
 func RunProcess(
 	name string, behavior ProcessBehavior, logger *log.Logger,
 ) error {
+	p := StartProcess(name, behavior, logger)
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+
+wait:
+	for {
+		select {
+		case <-p.terminated:
+			break wait
+
+		case signo := <-sigChan:
+			fmt.Fprintln(os.Stderr)
+			p.Log.Info("received signal %d (%v)", signo, signo)
+			p.Stop()
+		}
+	}
+
+	return p.Error()
+}
+
+func StartProcess(
+	name string, behavior ProcessBehavior, logger *log.Logger,
+) *Process {
 	logger = logger.With("scope", name)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -136,24 +161,7 @@ func RunProcess(
 
 	p.run(nil)
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(sigChan)
-
-wait:
-	for {
-		select {
-		case <-p.terminated:
-			break wait
-
-		case signo := <-sigChan:
-			fmt.Fprintln(os.Stderr)
-			p.Log.Info("received signal %d (%v)", signo, signo)
-			p.Stop()
-		}
-	}
-
-	return p.Error()
+	return &p
 }
 
 func (p *Process) State() (state ProcessState) {
@@ -161,6 +169,10 @@ func (p *Process) State() (state ProcessState) {
 	state = p.state
 	p.mutex.RUnlock()
 	return
+}
+
+func (p *Process) Terminated() <-chan struct{} {
+	return p.terminated
 }
 
 func (p *Process) Error() error {
