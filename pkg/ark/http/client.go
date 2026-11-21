@@ -191,6 +191,12 @@ func (c *Client) SendRequest(
 		return nil, fmt.Errorf("cannot create request: %w", err)
 	}
 
+	for name, values := range header {
+		for _, value := range values {
+			req.Header.Add(name, value)
+		}
+	}
+
 	res, err := c.Do(req)
 	if err != nil {
 		return nil, err
