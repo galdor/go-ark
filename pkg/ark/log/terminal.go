@@ -176,12 +176,12 @@ func (h *TerminalHandler) recordAttributes(r slog.Record) Attributes {
 }
 
 func (h *TerminalHandler) colorize(color Color, s string, pad int) string {
-	if !h.color {
-		return s
-	}
-
 	if pad != 0 {
 		s = fmt.Sprintf("%-*s", pad, s)
+	}
+
+	if !h.color {
+		return s
 	}
 
 	// Yes we only support ANSI terminals, no we do not care.
