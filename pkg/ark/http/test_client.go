@@ -29,7 +29,7 @@ func (c *TestClient) SendRequest(
 
 	res, err := c.Client.SendRequest(ctx, method, uri, header, reqBody, resBody)
 	if err != nil {
-		c.T.Errorf("cannot send HTTP request: %v", err)
+		c.T.Errorf("%v", err)
 		c.T.FailNow()
 	}
 
