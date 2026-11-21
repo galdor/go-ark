@@ -128,6 +128,38 @@ wait:
 	return p.Error()
 }
 
+func MustStartProcess(
+	name string, behavior ProcessBehavior, logger *log.Logger,
+) *Process {
+	// This function is not obvious. When process run, the only way to know they
+	// fail (as in "they terminated with an error") is to monitor the
+	// "terminated" chan and check the process error.
+	//
+	// RunProcess blocks and returns the error after termination. StartProcess,
+	// which is necessary e.g. in tests where we cannot block while the
+	// top-level process is running, cannot wait: it returns the process so that
+	// the caller can wait for termination. But the very point of the function
+	// is not to wait, so it has to be done in a goroutine.
+	//
+	// Adding MustStartProcess that behaves similarly to MustRunProcess and
+	// aborts on process failure make it transparent to the caller. The name of
+	// the function is not great, but here making it consistent with
+	// RunProcess/MustRunProcess feels more important.
+
+	p := StartProcess(name, behavior, logger)
+
+	go func() {
+		<-p.Terminated()
+
+		if err := p.Error(); err != nil {
+			logger.Error("%v", err)
+			os.Exit(1)
+		}
+	}()
+
+	return p
+}
+
 func StartProcess(
 	name string, behavior ProcessBehavior, logger *log.Logger,
 ) *Process {
