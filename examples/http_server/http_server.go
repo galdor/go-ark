@@ -66,7 +66,7 @@ func (e *Example) hSleep(h *http.Handler) {
 }
 
 func (e *Example) hWebsocket(h *http.Handler) {
-	h.HandleWebsocketUpgrade(&WebsocketEcho{})
+	h.HandleWebsocketUpgrade("echo", &WebsocketEcho{})
 }
 
 type WebsocketEcho struct {

@@ -94,7 +94,9 @@ func (h *WebsocketHandler) FormatTextMessage(format string, args ...any) error {
 	return h.WriteTextMessage([]byte(data))
 }
 
-func (h *Handler) HandleWebsocketUpgrade(behavior WebsocketHandlerBehavior) {
+func (h *Handler) HandleWebsocketUpgrade(
+	name string, behavior WebsocketHandlerBehavior,
+) {
 	wsOpts := websocket.AcceptOptions{}
 	conn, err := websocket.Accept(h.ResponseWriter, h.Request, &wsOpts)
 	if err != nil {
@@ -111,5 +113,5 @@ func (h *Handler) HandleWebsocketUpgrade(behavior WebsocketHandlerBehavior) {
 	}
 
 	processOpts := ark.ProcessOptions{Inline: true, Unlinked: true}
-	h.process.AddChildWithOptions("websocket_handler", handler, processOpts)
+	h.process.AddChildWithOptions(name, handler, processOpts)
 }
