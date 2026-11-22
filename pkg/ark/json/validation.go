@@ -331,6 +331,66 @@ func (v *Validator) CheckObject(token any, value any) bool {
 	return v.doCheckObject(token, value)
 }
 
+func (v *Validator) CheckObjectArray(token, value any) bool {
+	valueType := reflect.TypeOf(value)
+	kind := valueType.Kind()
+
+	if kind != reflect.Array && kind != reflect.Slice {
+		utils.Panic("value %#v (%T) is not an array or slice", value, value)
+	}
+
+	ok := true
+
+	if token != nil {
+		v.Push(token)
+	}
+
+	values := reflect.ValueOf(value)
+	for i := 0; i < values.Len(); i++ {
+		child := values.Index(i).Interface()
+		childOk := v.CheckObject(strconv.Itoa(i), child)
+		ok = ok && childOk
+	}
+
+	defer func() {
+		if token != nil {
+			v.Pop()
+		}
+	}()
+
+	return ok
+}
+
+func (v *Validator) CheckObjectMap(token, value any) bool {
+	valueType := reflect.TypeOf(value)
+	if valueType.Kind() != reflect.Map {
+		utils.Panic("value %#v (%T) is not a map", value, value)
+	}
+
+	ok := true
+
+	v.WithChild(token, func() {
+		values := reflect.ValueOf(value)
+
+		iter := values.MapRange()
+		for iter.Next() {
+			key := iter.Key()
+			if key.Kind() != reflect.String {
+				utils.Panic("value %#v (%T) is a map whose keys are "+
+					"not strings", value, value)
+			}
+			keyString := key.Interface().(string)
+
+			value := iter.Value().Interface()
+
+			valueOk := v.CheckObject(keyString, value)
+			ok = ok && valueOk
+		}
+	})
+
+	return ok
+}
+
 func (v *Validator) doCheckObject(token, value any) bool {
 	nbErrors := len(v.Errors)
 
