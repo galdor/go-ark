@@ -1,6 +1,7 @@
 package json
 
 import (
+	"bytes"
 	"encoding/json/jsontext"
 	"errors"
 	"fmt"
@@ -177,6 +178,53 @@ func (v *Validator) CheckStringLengthMinMax(
 func (v *Validator) CheckStringNotEmpty(token any, s string) bool {
 	return v.Check(token, s != "", "missing_or_empty_string",
 		"missing or empty string")
+}
+
+func (v *Validator) CheckStringValue(token, value, values any) bool {
+	valueType := reflect.TypeOf(value)
+	if valueType.Kind() != reflect.String {
+		utils.Panic("value %#v (%T) is not a string", value, value)
+	}
+
+	s := reflect.ValueOf(value).String()
+
+	valuesType := reflect.TypeOf(values)
+	if valuesType.Kind() != reflect.Slice {
+		utils.Panic("values %#v (%T) are not a slice", values, values)
+	}
+	if valuesType.Elem().Kind() != reflect.String {
+		utils.Panic("values %#v (%T) are not a slice of strings",
+			values, values)
+	}
+
+	valuesValue := reflect.ValueOf(values)
+
+	found := false
+	for i := 0; i < valuesValue.Len(); i++ {
+		s2 := valuesValue.Index(i).String()
+		if s == s2 {
+			found = true
+		}
+	}
+
+	if !found {
+		var buf bytes.Buffer
+
+		buf.WriteString("value must be one of the following strings: ")
+
+		for i := 0; i < valuesValue.Len(); i++ {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+
+			s2 := valuesValue.Index(i).String()
+			buf.WriteString(s2)
+		}
+
+		v.AddError(token, "invalid_value", "%s", buf.String())
+	}
+
+	return found
 }
 
 func (v *Validator) CheckURI(token any, s string) bool {
